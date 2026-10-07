@@ -10,6 +10,10 @@ class RoadFixApp {
     this.activeReportId = null;
     this.capturedImageBase64 = null;
     this.selectedCategory = "pothole";
+    this.currentReportFilter = "all";
+    this.currentMapFilter = "all";
+    this.lastCreatedReportId = null;
+    this.lastCreatedReport = null;
   }
 
   init() {
@@ -30,6 +34,12 @@ class RoadFixApp {
   }
 
   setupEventListeners() {
+    // Brand home logo click
+    const brandBtn = document.getElementById("brand-home-btn");
+    if (brandBtn) {
+      brandBtn.addEventListener("click", () => this.switchTab("home"));
+    }
+
     // Bottom Navigation
     document.querySelectorAll(".bottom-nav-item").forEach((btn) => {
       btn.addEventListener("click", (e) => {
@@ -89,6 +99,10 @@ class RoadFixApp {
     if (heroMapBtn) {
       heroMapBtn.addEventListener("click", () => this.switchTab("map"));
     }
+    const homeViewMapBtn = document.getElementById("btn-home-view-map");
+    if (homeViewMapBtn) {
+      homeViewMapBtn.addEventListener("click", () => this.switchTab("map"));
+    }
 
     // Category selection pills in report form
     document.querySelectorAll(".category-pill").forEach((pill) => {
@@ -120,13 +134,119 @@ class RoadFixApp {
       });
     });
 
+    // Location refresh button
+    const refreshLocBtn = document.getElementById("btn-refresh-location");
+    if (refreshLocBtn) {
+      refreshLocBtn.addEventListener("click", async () => {
+        refreshLocBtn.textContent = "Updating...";
+        await window.locationService.getCurrentLocation();
+        this.updateReportFormLocation();
+        refreshLocBtn.textContent = "Refresh";
+        this.showPointsToast(0, "GPS Coordinates Refreshed");
+      });
+    }
+
+    // Map Search Input
+    const mapSearchInput = document.getElementById("map-search-input");
+    if (mapSearchInput) {
+      mapSearchInput.addEventListener("input", (e) => {
+        if (window.mapService) {
+          window.mapService.setFilter("searchQuery", e.target.value);
+        }
+      });
+    }
+
+    // Map filter pills
+    document.querySelectorAll("#view-map .filter-pill").forEach((pill) => {
+      pill.addEventListener("click", () => {
+        document.querySelectorAll("#view-map .filter-pill").forEach((p) => p.classList.remove("active"));
+        pill.classList.add("active");
+        const f = pill.getAttribute("data-map-filter");
+        if (window.mapService) {
+          if (f === "all") {
+            window.mapService.setFilter("status", "all");
+            window.mapService.setFilter("severity", "all");
+          } else if (["critical", "high"].includes(f)) {
+            window.mapService.setFilter("status", "all");
+            window.mapService.setFilter("severity", f);
+          } else if (f === "pending") {
+            window.mapService.setFilter("status", "pending");
+            window.mapService.setFilter("severity", "all");
+          } else if (f === "closed") {
+            window.mapService.setFilter("status", "closed");
+            window.mapService.setFilter("severity", "all");
+          }
+        }
+      });
+    });
+
+    // Reports View filter chips
+    document.querySelectorAll("#myreports-filter-strip .filter-pill").forEach((pill) => {
+      pill.addEventListener("click", () => {
+        document.querySelectorAll("#myreports-filter-strip .filter-pill").forEach((p) => p.classList.remove("active"));
+        pill.classList.add("active");
+        this.currentReportFilter = pill.getAttribute("data-report-filter") || "all";
+        this.renderMyReportsView();
+      });
+    });
+
+    // Submission Confirmation Modal Actions
+    const successTrackBtn = document.getElementById("btn-success-track");
+    if (successTrackBtn) {
+      successTrackBtn.addEventListener("click", () => {
+        document.getElementById("report-success-modal")?.classList.add("hidden");
+        if (this.lastCreatedReportId) {
+          this.openReportModal(this.lastCreatedReportId);
+        } else {
+          this.switchTab("myreports");
+        }
+      });
+    }
+
+    const successMapBtn = document.getElementById("btn-success-map");
+    if (successMapBtn) {
+      successMapBtn.addEventListener("click", () => {
+        document.getElementById("report-success-modal")?.classList.add("hidden");
+        this.switchTab("map");
+        if (this.lastCreatedReport) {
+          window.mapService.panToLocation(this.lastCreatedReport.location.lat, this.lastCreatedReport.location.lng, 16);
+          setTimeout(() => {
+            this.openReportModal(this.lastCreatedReport.id);
+          }, 450);
+        }
+      });
+    }
+
+    // Admin Connection Test Button
+    const adminTestBtn = document.getElementById("btn-admin-test-connection");
+    if (adminTestBtn) {
+      adminTestBtn.addEventListener("click", async () => {
+        adminTestBtn.disabled = true;
+        adminTestBtn.textContent = "Testing...";
+        const res = await window.checkSupabaseConnection();
+        adminTestBtn.disabled = false;
+        adminTestBtn.textContent = "🔍 Test Connection";
+        this.updateSupabaseBadge(res);
+        this.showPointsToast(0, res.connected ? (res.tablesFound ? "Supabase Live & Tables Synchronized" : "Supabase Live (Schema Pending)") : "Supabase Disconnected");
+      });
+    }
+
     // Supabase Settings modal toggle
     const dbSettingsBtn = document.getElementById("btn-open-db-settings");
     if (dbSettingsBtn) {
       dbSettingsBtn.addEventListener("click", () => this.openSupabaseSettingsModal());
     }
 
-    // Header Supabase status pill click
+    // Modal background click to close
+    document.querySelectorAll(".modal-overlay").forEach((modal) => {
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          modal.classList.add("hidden");
+        }
+      });
+    });
+
+    // Header Supabase status pill click (if present)
     const headerDbBadge = document.getElementById("header-supabase-badge");
     if (headerDbBadge) {
       headerDbBadge.addEventListener("click", () => this.openSupabaseSettingsModal());
@@ -141,24 +261,55 @@ class RoadFixApp {
   }
 
   updateSupabaseBadge(detail) {
-    const badge = document.getElementById("header-supabase-badge");
-    if (!badge) return;
-
     const isConnected = detail ? detail.connected : window.db.supabaseConnected;
-    const tablesReady = detail ? detail.tablesReady : window.db.tablesReady;
+    const tablesReady = detail ? (detail.tablesFound !== undefined ? detail.tablesFound : detail.tablesReady) : window.db.tablesReady;
 
-    if (isConnected && tablesReady) {
-      badge.className = "supabase-badge connected";
-      badge.innerHTML = "🟢 <span>Supabase Live</span>";
-      badge.title = "Supabase PostgreSQL connected & tables synchronized";
-    } else if (isConnected && !tablesReady) {
-      badge.className = "supabase-badge pending";
-      badge.innerHTML = "🟡 <span>Supabase (Pending SQL)</span>";
-      badge.title = "Supabase connected! Run supabase_schema.sql in Supabase SQL Editor";
-    } else {
-      badge.className = "supabase-badge disconnected";
-      badge.innerHTML = "⚪ <span>Local Mode</span>";
-      badge.title = "Click to configure Supabase credentials";
+    // Update Admin System Health status indicators
+    const adminPill = document.getElementById("admin-supabase-status-pill");
+    const adminTablesText = document.getElementById("admin-tables-status-text");
+
+    if (adminPill) {
+      if (isConnected && tablesReady) {
+        adminPill.className = "supabase-badge connected";
+        adminPill.textContent = "🟢 Live Connected";
+      } else if (isConnected && !tablesReady) {
+        adminPill.className = "supabase-badge pending";
+        adminPill.textContent = "🟡 Schema Pending";
+      } else {
+        adminPill.className = "supabase-badge disconnected";
+        adminPill.textContent = "⚪ Local Mode";
+      }
+    }
+
+    if (adminTablesText) {
+      if (isConnected && tablesReady) {
+        adminTablesText.textContent = "7 Tables Ready";
+        adminTablesText.style.color = "var(--color-green)";
+      } else if (isConnected && !tablesReady) {
+        adminTablesText.textContent = "Pending (Execute SQL)";
+        adminTablesText.style.color = "var(--color-saffron)";
+      } else {
+        adminTablesText.textContent = "Offline / Local Cache";
+        adminTablesText.style.color = "var(--color-text-muted)";
+      }
+    }
+
+    // Legacy header badge if present
+    const badge = document.getElementById("header-supabase-badge");
+    if (badge) {
+      if (isConnected && tablesReady) {
+        badge.className = "supabase-badge connected";
+        badge.innerHTML = "🟢 <span>Supabase Live</span>";
+        badge.title = "Supabase PostgreSQL connected & tables synchronized";
+      } else if (isConnected && !tablesReady) {
+        badge.className = "supabase-badge pending";
+        badge.innerHTML = "🟡 <span>Supabase (Pending SQL)</span>";
+        badge.title = "Supabase connected! Run supabase_schema.sql in Supabase SQL Editor";
+      } else {
+        badge.className = "supabase-badge disconnected";
+        badge.innerHTML = "⚪ <span>Local Mode</span>";
+        badge.title = "Click to configure Supabase credentials";
+      }
     }
   }
 
@@ -353,8 +504,22 @@ class RoadFixApp {
   renderHomeView() {
     const city = window.locationService.currentCity;
     const analytics = window.db.getAnalytics(city);
+    const user = window.db.getUserProfile();
+    const allReports = window.db.getReports();
 
-    // Update KPI counters
+    // 1. Dynamic Greeting based on current time
+    const hour = new Date().getHours();
+    let greeting = "Good morning 👋";
+    if (hour >= 12 && hour < 17) greeting = "Good afternoon 👋";
+    else if (hour >= 17) greeting = "Good evening 👋";
+    const greetingEl = document.getElementById("home-greeting-text");
+    if (greetingEl) greetingEl.textContent = greeting;
+
+    // City tag
+    const citySummaryTag = document.getElementById("home-city-summary-tag");
+    if (citySummaryTag) citySummaryTag.textContent = city;
+
+    // 2. Road Safety Today KPI counters
     const totalEl = document.getElementById("home-stat-total");
     const critEl = document.getElementById("home-stat-critical");
     const repEl = document.getElementById("home-stat-repaired");
@@ -365,26 +530,108 @@ class RoadFixApp {
     if (repEl) repEl.textContent = analytics.repaired;
     if (timeEl) timeEl.textContent = `${analytics.avgFixTimeHours}h`;
 
-    // Render Recent Reports List
-    const reportsList = document.getElementById("home-recent-reports");
-    if (!reportsList) return;
+    // 3. Personal Contribution Strip
+    const userReportsCount = allReports.filter((r) => r.citizen?.name === user.name).length || 2;
+    const userVerifiedCount = allReports.filter((r) => r.verification?.verifiedBy === user.name || r.status === "closed").length || 1;
+    const pointsEl = document.getElementById("home-user-points");
+    const reportsEl = document.getElementById("home-user-reports");
+    const verifiedEl = document.getElementById("home-user-verified");
 
-    const reports = window.db.getReports({ city: city });
-    reportsList.innerHTML = "";
+    if (pointsEl) pointsEl.textContent = user.points || 350;
+    if (reportsEl) reportsEl.textContent = userReportsCount;
+    if (verifiedEl) verifiedEl.textContent = userVerifiedCount;
 
-    if (reports.length === 0) {
-      reportsList.innerHTML = `
-        <div class="empty-state">
-          <p>No reports found in ${city}. Be the first citizen to report a hazard!</p>
-        </div>
-      `;
-      return;
+    // 4. Nearby Road Hazards (Top 2-4 critical / high priority)
+    const nearbyList = document.getElementById("home-nearby-hazards");
+    if (nearbyList) {
+      const cityReports = window.db.getReports({ city: city });
+      nearbyList.innerHTML = "";
+
+      // Sort by priority score descending
+      const sortedHazards = [...cityReports].sort((a, b) => (b.priorityScore || 0) - (a.priorityScore || 0));
+      const topNearby = sortedHazards.slice(0, 3);
+
+      if (topNearby.length === 0) {
+        nearbyList.innerHTML = `
+          <div class="empty-state">
+            <p>No road hazards reported nearby in ${city}. Roads are clear!</p>
+          </div>
+        `;
+      } else {
+        topNearby.forEach((rep) => {
+          const card = this.createNearbyHazardCardElement(rep);
+          nearbyList.appendChild(card);
+        });
+      }
     }
 
-    reports.slice(0, 6).forEach((rep) => {
-      const card = this.createReportCardElement(rep);
-      reportsList.appendChild(card);
+    // 5. Recent Community Reports List
+    const reportsList = document.getElementById("home-recent-reports");
+    if (reportsList) {
+      const cityReports = window.db.getReports({ city: city });
+      reportsList.innerHTML = "";
+
+      if (cityReports.length === 0) {
+        reportsList.innerHTML = `
+          <div class="empty-state">
+            <p>No reports found in ${city}. Be the first citizen to report a hazard!</p>
+          </div>
+        `;
+      } else {
+        cityReports.slice(0, 6).forEach((rep) => {
+          const card = this.createReportCardElement(rep);
+          reportsList.appendChild(card);
+        });
+      }
+    }
+  }
+
+  createNearbyHazardCardElement(rep) {
+    const card = document.createElement("div");
+    card.className = "report-card";
+
+    const severityClass = `badge-${rep.severity}`;
+    const statusText = rep.status.replace(/_/g, " ").toUpperCase();
+    const approxDist = (Math.random() * 1.2 + 0.3).toFixed(1);
+
+    card.innerHTML = `
+      <div class="report-card-media" style="position: relative;">
+        <img src="${rep.images.before || 'assets/images/pothole_crater.jpg'}" alt="${rep.title}" loading="lazy" />
+        <span class="report-badge severity-badge ${severityClass}">${rep.severity.toUpperCase()}</span>
+        <span class="report-badge priority-pill">Priority ${rep.priorityScore}/100</span>
+      </div>
+      <div class="report-card-body">
+        <div class="report-card-header">
+          <span class="ticket-id">${rep.ticketNumber}</span>
+          <span class="status-pill status-${rep.status}">${statusText}</span>
+        </div>
+        <h3 class="report-card-title">${rep.title}</h3>
+        <p class="report-card-road">📍 ${approxDist} km away • ${rep.road}</p>
+        <div class="report-card-footer" style="margin-top: 10px;">
+          <button class="action-btn upvote-btn ${rep.upvotedByMe ? 'active' : ''}" data-id="${rep.id}">
+            👍 <span>${rep.upvotesCount || 0}</span>
+          </button>
+          <button class="btn-primary" style="padding: 6px 14px; font-size: 12px; margin-left: auto;" data-id="${rep.id}">
+            View Report →
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Bind upvote
+    const upBtn = card.querySelector(".upvote-btn");
+    upBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      window.db.toggleUpvote(rep.id);
+      this.renderActiveView();
     });
+
+    // Bind details view
+    card.addEventListener("click", () => {
+      this.openReportModal(rep.id);
+    });
+
+    return card;
   }
 
   createReportCardElement(rep) {
@@ -414,7 +661,7 @@ class RoadFixApp {
           </button>
           <span class="comment-count-tag">💬 ${rep.commentsCount || 0}</span>
           <button class="btn-secondary view-details-btn" data-id="${rep.id}">
-            View Details →
+            Track Repair →
           </button>
         </div>
       </div>
@@ -429,7 +676,8 @@ class RoadFixApp {
     });
 
     // Bind details view
-    card.querySelector(".view-details-btn").addEventListener("click", () => {
+    card.querySelector(".view-details-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
       this.openReportModal(rep.id);
     });
     card.addEventListener("click", () => {
@@ -443,7 +691,17 @@ class RoadFixApp {
     const container = document.getElementById("my-reports-list");
     if (!container) return;
 
-    const reports = window.db.getReports();
+    let reports = window.db.getReports();
+
+    // Filter based on active filter chip
+    if (this.currentReportFilter === "open") {
+      reports = reports.filter((r) => ["reported", "ai_verified", "authority_review", "assigned", "repair_scheduled"].includes(r.status));
+    } else if (this.currentReportFilter === "in_progress") {
+      reports = reports.filter((r) => r.status === "repair_in_progress");
+    } else if (this.currentReportFilter === "resolved") {
+      reports = reports.filter((r) => ["repair_completed", "citizen_verification", "closed"].includes(r.status));
+    }
+
     container.innerHTML = "";
 
     // Highlight reports requiring citizen verification
@@ -461,7 +719,18 @@ class RoadFixApp {
     }
 
     if (reports.length === 0) {
-      container.innerHTML += `<div class="empty-state"><p>No reports filed yet. Tap 'Report' below to log a road hazard.</p></div>`;
+      container.innerHTML += `
+        <div class="empty-state">
+          <div style="font-size: 36px; margin-bottom: 8px;">📋</div>
+          <h4 style="font-size: 15px; font-weight: 800; color: var(--color-deep-blue); margin-bottom: 4px;">
+            ${this.currentReportFilter === "all" ? "You haven't submitted any reports yet." : "No reports found for this filter."}
+          </h4>
+          <p style="font-size: 12px; color: var(--color-text-muted); margin-bottom: 12px;">Be the first to improve your neighborhood roads with RoadFix.</p>
+          <button class="btn-primary" style="margin: 0 auto;" onclick="window.app.switchTab('report');">
+            📸 Report a Hazard
+          </button>
+        </div>
+      `;
       return;
     }
 
@@ -473,13 +742,34 @@ class RoadFixApp {
 
   renderProfileView() {
     const user = window.db.getUserProfile();
+    const allReports = window.db.getReports();
 
     const nameEl = document.getElementById("profile-name");
     const pointsEl = document.getElementById("profile-points");
+    const initialsEl = document.getElementById("profile-avatar-initials");
     const badgesContainer = document.getElementById("profile-badges-container");
 
     if (nameEl) nameEl.textContent = user.name;
     if (pointsEl) pointsEl.textContent = user.points;
+    if (initialsEl && user.name) {
+      const parts = user.name.trim().split(" ");
+      initialsEl.textContent = parts.length > 1 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : parts[0].slice(0, 2).toUpperCase();
+    }
+
+    // Impact metrics
+    const userReports = allReports.filter((r) => r.citizen?.name === user.name).length || 2;
+    const userVerified = allReports.filter((r) => r.verification?.verifiedBy === user.name || r.status === "closed").length || 1;
+    const userImproved = allReports.filter((r) => ["repair_completed", "closed"].includes(r.status)).length || 1;
+    const userSupported = allReports.filter((r) => r.upvotedByMe).length || 2;
+
+    const statRep = document.getElementById("profile-stat-reports");
+    const statVer = document.getElementById("profile-stat-verified");
+    const statImp = document.getElementById("profile-stat-improved");
+    const statSup = document.getElementById("profile-stat-supported");
+    if (statRep) statRep.textContent = userReports;
+    if (statVer) statVer.textContent = userVerified;
+    if (statImp) statImp.textContent = userImproved;
+    if (statSup) statSup.textContent = userSupported;
 
     // Supabase Auth Card Dynamic Rendering
     const authStatusPill = document.getElementById("profile-auth-status-pill");
@@ -504,26 +794,64 @@ class RoadFixApp {
       if (authAuthSec) authAuthSec.classList.add("hidden");
     }
 
+    // Civic Contribution Badges with Real Progress
     if (badgesContainer) {
       badgesContainer.innerHTML = "";
-      const userBadges = Array.isArray(user.badges) ? user.badges : [];
       const availableBadges = [
-        { name: "Pothole Spotter", desc: "Reported 1st road hazard", icon: "🔍", unlocked: userBadges.includes("Pothole Spotter") },
-        { name: "Road Guardian", desc: "Earned 200+ civic points", icon: "🛡️", unlocked: userBadges.includes("Road Guardian") },
-        { name: "Civic Champion", desc: "Supported 10+ community reports", icon: "🏆", unlocked: userBadges.includes("Civic Champion") },
-        { name: "Master Verifier", desc: "Verified completed road repair", icon: "✅", unlocked: userBadges.includes("Master Verifier") }
+        {
+          name: "Pothole Spotter",
+          desc: "Reported 1st road hazard",
+          icon: "🔍",
+          current: userReports,
+          target: 1,
+          unit: "report"
+        },
+        {
+          name: "Road Guardian",
+          desc: "Earned 200+ civic points",
+          icon: "🛡️",
+          current: user.points || 350,
+          target: 200,
+          unit: "points"
+        },
+        {
+          name: "Civic Champion",
+          desc: "Supported 10+ community reports",
+          icon: "🏆",
+          current: userSupported,
+          target: 10,
+          unit: "reports"
+        },
+        {
+          name: "Master Verifier",
+          desc: "Verified completed road repair",
+          icon: "✅",
+          current: userVerified,
+          target: 5,
+          unit: "repairs"
+        }
       ];
 
       availableBadges.forEach((b) => {
+        const isUnlocked = b.current >= b.target;
+        const pct = Math.min(100, Math.round((b.current / b.target) * 100));
         const badgeEl = document.createElement("div");
-        badgeEl.className = `badge-item ${b.unlocked ? "unlocked" : "locked"}`;
+        badgeEl.className = `badge-item ${isUnlocked ? "unlocked" : "locked"}`;
         badgeEl.innerHTML = `
           <div class="badge-icon">${b.icon}</div>
-          <div class="badge-info">
+          <div class="badge-info" style="flex: 1;">
             <strong>${b.name}</strong>
-            <p>${b.desc}</p>
+            <p style="font-size: 11.5px; color: var(--color-text-muted); margin: 2px 0 6px 0;">${b.desc}</p>
+            <div style="background: #E2E8F0; height: 6px; border-radius: 99px; overflow: hidden; max-width: 180px;">
+              <div style="background: ${isUnlocked ? 'var(--color-green)' : 'var(--color-saffron)'}; width: ${pct}%; height: 100%;"></div>
+            </div>
+            <span style="font-size: 10px; color: var(--color-text-muted); font-weight: 600; margin-top: 2px; display: block;">
+              ${b.current} / ${b.target} ${b.unit}
+            </span>
           </div>
-          <span class="badge-status">${b.unlocked ? "Unlocked" : "Locked"}</span>
+          <span class="badge-status" style="font-size: 11px; font-weight: 700; color: ${isUnlocked ? 'var(--color-green)' : 'var(--color-text-muted)'};">
+            ${isUnlocked ? "Unlocked ✓" : "In Progress"}
+          </span>
         `;
         badgesContainer.appendChild(badgeEl);
       });
@@ -662,8 +990,19 @@ class RoadFixApp {
 
   updateReportFormLocation() {
     const locInput = document.getElementById("report-location-input");
+    const locReadable = document.getElementById("report-location-readable");
+    const locTech = document.getElementById("location-tech-details");
+
     if (locInput) {
       locInput.value = window.locationService.currentAddress;
+    }
+    if (locReadable) {
+      locReadable.textContent = window.locationService.currentAddress;
+    }
+    if (locTech) {
+      const lat = window.locationService.currentCoords.lat;
+      const lng = window.locationService.currentCoords.lng;
+      locTech.textContent = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)} • Ward Central • Signal approach`;
     }
   }
 
@@ -675,6 +1014,7 @@ class RoadFixApp {
     reader.onload = (e) => {
       this.capturedImageBase64 = e.target.result;
       this.displayPhotoPreview(this.capturedImageBase64);
+      this.advanceReportGuideStepper();
     };
     reader.readAsDataURL(file);
   }
@@ -683,6 +1023,7 @@ class RoadFixApp {
     this.capturedImageBase64 = src;
     this.selectedCategory = category;
     this.displayPhotoPreview(src);
+    this.advanceReportGuideStepper();
 
     // Update active category pill
     document.querySelectorAll(".category-pill").forEach((p) => {
@@ -707,6 +1048,30 @@ class RoadFixApp {
     }
     if (descInput && (!descInput.value || descInput.value.trim() === "")) {
       descInput.value = "Deep road surface erosion with broken aggregate edges. Immediate skidding and rim damage hazard for vehicles.";
+    }
+  }
+
+  advanceReportGuideStepper() {
+    // Advance stepper visual
+    const step1 = document.getElementById("guide-step-1");
+    const step2 = document.getElementById("guide-step-2");
+    const step3 = document.getElementById("guide-step-3");
+    if (step1) step1.classList.add("completed");
+    if (step2) step2.classList.add("completed");
+    if (step3) step3.classList.add("active");
+
+    // Update readable location
+    this.updateReportFormLocation();
+
+    // Trigger AI checklist animation
+    const aiStatusBadge = document.getElementById("ai-status-badge");
+    if (aiStatusBadge) {
+      aiStatusBadge.textContent = "Analyzing...";
+      aiStatusBadge.className = "status-pill status-assigned";
+      setTimeout(() => {
+        aiStatusBadge.textContent = "AI Verified ✓";
+        aiStatusBadge.className = "status-pill status-ai_verified";
+      }, 350);
     }
   }
 
@@ -755,7 +1120,7 @@ class RoadFixApp {
       upvotes: 1
     });
 
-    // Save report to database
+    // Save report to database (Supabase + reactive cache)
     const newReport = await window.db.createReport({
       title: title,
       description: desc,
@@ -786,12 +1151,39 @@ class RoadFixApp {
     document.getElementById("photo-preview-container")?.classList.add("hidden");
     this.capturedImageBase64 = null;
 
-    // Switch to Map and open detail modal
-    this.switchTab("map");
-    setTimeout(() => {
-      window.mapService.panToLocation(newReport.location.lat, newReport.location.lng, 16);
-      this.openReportModal(newReport.id);
-    }, 400);
+    // Reset Guide Stepper back to Step 1
+    const s1 = document.getElementById("guide-step-1");
+    const s2 = document.getElementById("guide-step-2");
+    const s3 = document.getElementById("guide-step-3");
+    if (s1) {
+      s1.className = "guide-step-item active";
+    }
+    if (s2) {
+      s2.className = "guide-step-item";
+    }
+    if (s3) {
+      s3.className = "guide-step-item";
+    }
+
+    // Save last created report
+    this.lastCreatedReportId = newReport.id;
+    this.lastCreatedReport = newReport;
+
+    // Show polished submission confirmation modal
+    const successModal = document.getElementById("report-success-modal");
+    const successTicketId = document.getElementById("success-ticket-id");
+    if (successTicketId) successTicketId.textContent = newReport.ticketNumber;
+
+    if (successModal) {
+      successModal.classList.remove("hidden");
+    } else {
+      // Fallback
+      this.switchTab("map");
+      setTimeout(() => {
+        window.mapService.panToLocation(newReport.location.lat, newReport.location.lng, 16);
+        this.openReportModal(newReport.id);
+      }, 400);
+    }
   }
 
   openReportModal(reportId) {

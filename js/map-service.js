@@ -10,7 +10,7 @@ class RoadFixMapService {
     this.markersLayer = null;
     this.hotspotsLayer = null;
     this.userLocationMarker = null;
-    this.activeFilter = { status: "all", severity: "all", showHotspots: true };
+    this.activeFilter = { status: "all", severity: "all", showHotspots: true, searchQuery: "" };
     this.isInitialized = false;
   }
 
@@ -67,14 +67,27 @@ class RoadFixMapService {
     this.hotspotsLayer.clearLayers();
 
     const currentCity = window.locationService?.currentCity || "Hyderabad";
-    const reports = window.db.getReports({
+    let reports = window.db.getReports({
       city: currentCity,
       status: this.activeFilter.status,
       severity: this.activeFilter.severity
     });
 
+    // Apply search query filter if set
+    const query = (this.activeFilter.searchQuery || "").trim().toLowerCase();
+    if (query) {
+      reports = reports.filter((rep) => {
+        return (
+          (rep.title && rep.title.toLowerCase().includes(query)) ||
+          (rep.road && rep.road.toLowerCase().includes(query)) ||
+          (rep.ticketNumber && rep.ticketNumber.toLowerCase().includes(query)) ||
+          (rep.category && rep.category.toLowerCase().includes(query))
+        );
+      });
+    }
+
     // 1. Plot Report Markers
-    reports.forEach((rep) => {
+    reports.forEach((rep, idx) => {
       if (!rep.location || !rep.location.lat || !rep.location.lng) return;
 
       const markerIcon = this.createSeverityIcon(rep.severity, rep.status);
@@ -93,10 +106,15 @@ class RoadFixMapService {
       );
 
       this.markersLayer.addLayer(marker);
+
+      // Pan to first search result if active query
+      if (query && idx === 0) {
+        this.map.panTo([rep.location.lat, rep.location.lng]);
+      }
     });
 
     // 2. Plot Hotspot Zones if enabled
-    if (this.activeFilter.showHotspots) {
+    if (this.activeFilter.showHotspots && !query) {
       const hotspots = window.db.getHotspots(currentCity);
       hotspots.forEach((hs) => {
         const circle = L.circle([hs.lat, hs.lng], {

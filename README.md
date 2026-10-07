@@ -104,14 +104,47 @@ Realistic road data for 8 major Indian metro regions:
 
 ---
 
-## 🛠️ Supabase PostgreSQL Setup
+## 🛠️ Supabase PostgreSQL Cloud Backend Integration
 
-The app works seamlessly out of the box with the local reactive persistent engine. To connect live Supabase:
+RoadFix is powered by **Supabase PostgreSQL** as its primary cloud database and authentication provider.
 
-1. Open your [Supabase Dashboard](https://supabase.com).
-2. Go to the **SQL Editor** and run the provided [`supabase_schema.sql`](file:///c:/Users/user/OneDrive/Documents/New%20folder/supabase_schema.sql).
-3. In the RoadFix web app, go to **Profile → Configure Supabase Credentials**.
-4. Enter your Supabase Project URL and public Anon Key, then toggle **Enable live Supabase sync**.
+### 1. Environment Configuration
+Configuration is kept centralized and secure:
+- **`.env`**: Stores `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY`. Ignored by git to protect secrets.
+- **`src/lib/supabase.js`**: Centralized ES Module client for Vite/bundler setups.
+- **`js/supabase-client.js`**: Centralized client for browser runtime via official `@supabase/supabase-js` SDK.
+- **`js/config.js`**: Centralized environment loader.
+
+```env
+VITE_SUPABASE_URL=https://pnqgwxmgtptzygydttzr.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_Vk-Fz3sITT2fFNVqrVxigg_gEONLaJ5
+```
+
+> **Security Note**: Only the Supabase publishable/anon key is used in frontend code. The Supabase service-role key is never exposed.
+
+### 2. Database Schema & RLS Setup
+To activate all tables and security policies in your Supabase project:
+1. Open your [Supabase Project Dashboard](https://supabase.com/dashboard).
+2. Navigate to the **SQL Editor** in the left sidebar.
+3. Open or copy the contents of [`supabase_schema.sql`](file:///c:/Users/user/OneDrive/Documents/New%20folder/supabase_schema.sql).
+4. Click **Run** to execute the script.
+
+This automatically configures:
+- **`pothole_reports`**: Primary operational table with UUID keys, priority scoring, status lifecycle, and rich JSONB diagnostics.
+- **`profiles`**: User profiles with civic points and role-based access control.
+- **`comments`**: Community and municipal updates.
+- **`supporters`**: Citizen upvotes / hazard validations.
+- **`notifications`**: Lifecycle status alerts.
+- **`hotspots`**: Road safety GIS hazard zones.
+- **`audit_logs`**: Immutable audit trail for municipal actions.
+- **Row Level Security (RLS)**: Enforced across all tables with policies for public reads, citizen reporting, and authority actions.
+- **Auth Trigger**: Automatically creates a profile record whenever a user signs up.
+- **Preloaded Indian Metro Seed Data**: Instant showcase reports for Hyderabad, Bengaluru, Delhi, etc.
+
+### 3. Supabase Auth
+- Supported: Email/password signup, login, session persistence, and logout.
+- Access via **Profile (`#nav-profile`) → Supabase Authentication**.
+
 
 ---
 

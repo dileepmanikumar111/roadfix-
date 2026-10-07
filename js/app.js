@@ -14,7 +14,9 @@ class RoadFixApp {
 
   init() {
     this.setupEventListeners();
+    this.setupAuthUI();
     this.updateRoleUI();
+    this.updateSupabaseBadge();
     this.renderActiveView();
     this.updateNotificationBadge();
     this.initCitySelector();
@@ -124,10 +126,127 @@ class RoadFixApp {
       dbSettingsBtn.addEventListener("click", () => this.openSupabaseSettingsModal());
     }
 
+    // Header Supabase status pill click
+    const headerDbBadge = document.getElementById("header-supabase-badge");
+    if (headerDbBadge) {
+      headerDbBadge.addEventListener("click", () => this.openSupabaseSettingsModal());
+    }
+
     // Listen to global events
     window.addEventListener("roadfix:dataUpdated", () => this.renderActiveView());
     window.addEventListener("roadfix:notificationAdded", () => this.updateNotificationBadge());
     window.addEventListener("roadfix:pointsUpdated", (e) => this.showPointsToast(e.detail.points, e.detail.reason));
+    window.addEventListener("roadfix:supabaseConnectionChanged", (e) => this.updateSupabaseBadge(e.detail));
+    window.addEventListener("roadfix:authChanged", () => this.renderProfileView());
+  }
+
+  updateSupabaseBadge(detail) {
+    const badge = document.getElementById("header-supabase-badge");
+    if (!badge) return;
+
+    const isConnected = detail ? detail.connected : window.db.supabaseConnected;
+    const tablesReady = detail ? detail.tablesReady : window.db.tablesReady;
+
+    if (isConnected && tablesReady) {
+      badge.className = "supabase-badge connected";
+      badge.innerHTML = "🟢 <span>Supabase Live</span>";
+      badge.title = "Supabase PostgreSQL connected & tables synchronized";
+    } else if (isConnected && !tablesReady) {
+      badge.className = "supabase-badge pending";
+      badge.innerHTML = "🟡 <span>Supabase (Pending SQL)</span>";
+      badge.title = "Supabase connected! Run supabase_schema.sql in Supabase SQL Editor";
+    } else {
+      badge.className = "supabase-badge disconnected";
+      badge.innerHTML = "⚪ <span>Local Mode</span>";
+      badge.title = "Click to configure Supabase credentials";
+    }
+  }
+
+  setupAuthUI() {
+    const tabSignIn = document.getElementById("auth-tab-signin");
+    const tabSignUp = document.getElementById("auth-tab-signup");
+    const nameGroup = document.getElementById("auth-name-group");
+    const submitBtn = document.getElementById("btn-auth-submit");
+    const signOutBtn = document.getElementById("btn-auth-signout");
+    const msgBox = document.getElementById("auth-message-box");
+
+    let isSignUpMode = false;
+
+    if (tabSignIn && tabSignUp) {
+      tabSignIn.addEventListener("click", () => {
+        isSignUpMode = false;
+        tabSignIn.classList.add("active");
+        tabSignUp.classList.remove("active");
+        nameGroup?.classList.add("hidden");
+        if (submitBtn) submitBtn.textContent = "Sign In to Supabase";
+        if (msgBox) msgBox.classList.add("hidden");
+      });
+
+      tabSignUp.addEventListener("click", () => {
+        isSignUpMode = true;
+        tabSignUp.classList.add("active");
+        tabSignIn.classList.remove("active");
+        nameGroup?.classList.remove("hidden");
+        if (submitBtn) submitBtn.textContent = "Create Supabase Account";
+        if (msgBox) msgBox.classList.add("hidden");
+      });
+    }
+
+    if (submitBtn) {
+      submitBtn.addEventListener("click", async () => {
+        const email = document.getElementById("auth-email-input")?.value?.trim();
+        const password = document.getElementById("auth-password-input")?.value?.trim();
+        const fullName = document.getElementById("auth-name-input")?.value?.trim() || "Citizen Reporter";
+
+        if (!email || !password) {
+          if (msgBox) {
+            msgBox.style.cssText = "background:#FEE2E2; color:#991B1B; padding:8px; border-radius:4px; margin-bottom:8px;";
+            msgBox.textContent = "Please enter both email and password.";
+            msgBox.classList.remove("hidden");
+          }
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Connecting to Supabase...";
+
+        try {
+          if (isSignUpMode) {
+            await window.db.signUp(email, password, fullName);
+            if (msgBox) {
+              msgBox.style.cssText = "background:#DCFCE7; color:#166534; padding:8px; border-radius:4px; margin-bottom:8px;";
+              msgBox.textContent = "Account created! Please check your email or sign in.";
+              msgBox.classList.remove("hidden");
+            }
+          } else {
+            await window.db.signIn(email, password);
+            if (msgBox) {
+              msgBox.style.cssText = "background:#DCFCE7; color:#166534; padding:8px; border-radius:4px; margin-bottom:8px;";
+              msgBox.textContent = "Signed in successfully!";
+              msgBox.classList.remove("hidden");
+            }
+          }
+          this.renderProfileView();
+        } catch (err) {
+          if (msgBox) {
+            msgBox.style.cssText = "background:#FEE2E2; color:#991B1B; padding:8px; border-radius:4px; margin-bottom:8px;";
+            msgBox.textContent = err.message || "Authentication failed.";
+            msgBox.classList.remove("hidden");
+          }
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = isSignUpMode ? "Create Supabase Account" : "Sign In to Supabase";
+        }
+      });
+    }
+
+    if (signOutBtn) {
+      signOutBtn.addEventListener("click", async () => {
+        await window.db.signOut();
+        this.renderProfileView();
+        this.showPointsToast(0, "Signed out of Supabase");
+      });
+    }
   }
 
   initCitySelector() {
@@ -362,13 +481,37 @@ class RoadFixApp {
     if (nameEl) nameEl.textContent = user.name;
     if (pointsEl) pointsEl.textContent = user.points;
 
+    // Supabase Auth Card Dynamic Rendering
+    const authStatusPill = document.getElementById("profile-auth-status-pill");
+    const authUnauthSec = document.getElementById("auth-unauthenticated-section");
+    const authAuthSec = document.getElementById("auth-authenticated-section");
+    const loggedEmailEl = document.getElementById("auth-logged-email");
+
+    if (user.isAuthenticated && user.email) {
+      if (authStatusPill) {
+        authStatusPill.textContent = "Supabase Auth";
+        authStatusPill.className = "status-pill status-closed";
+      }
+      if (authUnauthSec) authUnauthSec.classList.add("hidden");
+      if (authAuthSec) authAuthSec.classList.remove("hidden");
+      if (loggedEmailEl) loggedEmailEl.textContent = user.email;
+    } else {
+      if (authStatusPill) {
+        authStatusPill.textContent = "Guest / Demo";
+        authStatusPill.className = "status-pill status-reported";
+      }
+      if (authUnauthSec) authUnauthSec.classList.remove("hidden");
+      if (authAuthSec) authAuthSec.classList.add("hidden");
+    }
+
     if (badgesContainer) {
       badgesContainer.innerHTML = "";
+      const userBadges = Array.isArray(user.badges) ? user.badges : [];
       const availableBadges = [
-        { name: "Pothole Spotter", desc: "Reported 1st road hazard", icon: "🔍", unlocked: user.badges.includes("Pothole Spotter") },
-        { name: "Road Guardian", desc: "Earned 200+ civic points", icon: "🛡️", unlocked: user.badges.includes("Road Guardian") },
-        { name: "Civic Champion", desc: "Supported 10+ community reports", icon: "🏆", unlocked: user.badges.includes("Civic Champion") },
-        { name: "Master Verifier", desc: "Verified completed road repair", icon: "✅", unlocked: user.badges.includes("Master Verifier") }
+        { name: "Pothole Spotter", desc: "Reported 1st road hazard", icon: "🔍", unlocked: userBadges.includes("Pothole Spotter") },
+        { name: "Road Guardian", desc: "Earned 200+ civic points", icon: "🛡️", unlocked: userBadges.includes("Road Guardian") },
+        { name: "Civic Champion", desc: "Supported 10+ community reports", icon: "🏆", unlocked: userBadges.includes("Civic Champion") },
+        { name: "Master Verifier", desc: "Verified completed road repair", icon: "✅", unlocked: userBadges.includes("Master Verifier") }
       ];
 
       availableBadges.forEach((b) => {
@@ -613,7 +756,7 @@ class RoadFixApp {
     });
 
     // Save report to database
-    const newReport = window.db.createReport({
+    const newReport = await window.db.createReport({
       title: title,
       description: desc,
       city: city,
@@ -761,8 +904,8 @@ class RoadFixApp {
     const upBtn = document.createElement("button");
     upBtn.className = `btn-secondary action-btn ${report.upvotedByMe ? "active" : ""}`;
     upBtn.innerHTML = `👍 ${report.upvotedByMe ? "Supported" : "Support"} (${report.upvotesCount || 0})`;
-    upBtn.onclick = () => {
-      window.db.toggleUpvote(report.id);
+    upBtn.onclick = async () => {
+      await window.db.toggleUpvote(report.id);
       this.openReportModal(report.id);
       this.renderActiveView();
     };
@@ -791,8 +934,8 @@ class RoadFixApp {
         const startBtn = document.createElement("button");
         startBtn.className = "btn-primary";
         startBtn.innerHTML = "🚜 Mark Repair In Progress";
-        startBtn.onclick = () => {
-          window.db.startRepairWork(report.id);
+        startBtn.onclick = async () => {
+          await window.db.startRepairWork(report.id);
           this.openReportModal(report.id);
           this.renderActiveView();
         };
@@ -807,6 +950,32 @@ class RoadFixApp {
         actionsContainer.appendChild(compBtn);
       }
     }
+
+    // Real Supabase Delete Action (Available for Admin, Authority, or Report Owner)
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "btn-danger";
+    deleteBtn.innerHTML = "🗑️ Delete Report";
+    deleteBtn.title = "Permanently remove this report from Supabase";
+    deleteBtn.onclick = async () => {
+      const confirmed = window.confirm(
+        `Are you sure you want to permanently delete report #${report.ticketNumber} from Supabase?\n\nThis destructive action cannot be undone.`
+      );
+      if (confirmed) {
+        try {
+          deleteBtn.disabled = true;
+          deleteBtn.textContent = "Deleting from Supabase...";
+          await window.db.deleteReport(report.id);
+          this.closeReportModal();
+          this.renderActiveView();
+          this.showPointsToast(0, `Deleted #${report.ticketNumber} from Supabase`);
+        } catch (err) {
+          alert(`Failed to delete record: ${err.message}`);
+          deleteBtn.disabled = false;
+          deleteBtn.textContent = "🗑️ Delete Report";
+        }
+      }
+    };
+    actionsContainer.appendChild(deleteBtn);
   }
 
   renderModalComments(report) {
@@ -830,11 +999,13 @@ class RoadFixApp {
     const addBtn = document.getElementById("btn-add-comment");
     const inputEl = document.getElementById("comment-input-field");
     if (addBtn && inputEl) {
-      addBtn.onclick = () => {
+      addBtn.onclick = async () => {
         if (!inputEl.value.trim()) return;
         const user = window.db.getUserProfile();
-        window.db.addComment(report.id, inputEl.value.trim(), user.name, user.role);
+        addBtn.disabled = true;
+        await window.db.addComment(report.id, inputEl.value.trim(), user.name, user.role);
         inputEl.value = "";
+        addBtn.disabled = false;
         this.openReportModal(report.id);
       };
     }
@@ -855,16 +1026,20 @@ class RoadFixApp {
     document.getElementById("assign-ticket-tag").textContent = report.ticketNumber;
 
     const submitBtn = document.getElementById("btn-submit-assignment");
-    submitBtn.onclick = () => {
+    submitBtn.onclick = async () => {
       const crew = document.getElementById("assign-crew-select")?.value || "GHMC Rapid Patch Squad #4";
       const date = document.getElementById("assign-date-input")?.value || new Date().toISOString().split("T")[0];
       const cost = Number(document.getElementById("assign-cost-input")?.value || 5500);
 
-      window.db.assignContractor(reportId, {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Assigning in Supabase...";
+      await window.db.assignContractor(reportId, {
         contractor: crew,
         scheduledDate: date,
         estimatedCost: cost
       });
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Confirm Team Assignment";
 
       modal.classList.add("hidden");
       this.openReportModal(reportId);
@@ -879,11 +1054,16 @@ class RoadFixApp {
     if (!modal) return;
 
     const confirmBtn = document.getElementById("btn-confirm-repair-completed");
-    confirmBtn.onclick = () => {
+    confirmBtn.onclick = async () => {
       const notes = document.getElementById("repair-crew-notes")?.value || "Asphalt rolled and leveled.";
       const asphalt = document.getElementById("repair-asphalt-type")?.value || "Hot Mix Bituminous Concrete (BC)";
 
-      window.db.completeRepair(reportId, "assets/images/pothole_repaired.jpg", notes, asphalt);
+      confirmBtn.disabled = true;
+      confirmBtn.textContent = "Updating in Supabase...";
+      await window.db.completeRepair(reportId, "assets/images/pothole_repaired.jpg", notes, asphalt);
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = "Submit For Citizen Verification";
+
       modal.classList.add("hidden");
       this.openReportModal(reportId);
       this.renderActiveView();
@@ -899,17 +1079,21 @@ class RoadFixApp {
     const approveBtn = document.getElementById("btn-verify-approve");
     const rejectBtn = document.getElementById("btn-verify-reject");
 
-    approveBtn.onclick = () => {
+    approveBtn.onclick = async () => {
       const comments = document.getElementById("verify-comments-input")?.value || "Confirmed smooth repair.";
-      window.db.citizenVerify(reportId, true, 5, comments);
+      approveBtn.disabled = true;
+      await window.db.citizenVerify(reportId, true, 5, comments);
+      approveBtn.disabled = false;
       modal.classList.add("hidden");
       this.openReportModal(reportId);
       this.renderActiveView();
     };
 
-    rejectBtn.onclick = () => {
+    rejectBtn.onclick = async () => {
       const comments = document.getElementById("verify-comments-input")?.value || "Substandard repair.";
-      window.db.citizenVerify(reportId, false, 2, comments);
+      rejectBtn.disabled = true;
+      await window.db.citizenVerify(reportId, false, 2, comments);
+      rejectBtn.disabled = false;
       modal.classList.add("hidden");
       this.openReportModal(reportId);
       this.renderActiveView();
@@ -975,14 +1159,62 @@ class RoadFixApp {
     document.getElementById("supabase-key-input").value = config.anonKey || "";
     document.getElementById("supabase-enabled-checkbox").checked = config.enabled;
 
+    const statusTag = document.getElementById("supabase-modal-status-tag");
+    const statusDetail = document.getElementById("supabase-modal-status-detail");
+
+    if (statusTag && statusDetail) {
+      if (window.db.supabaseConnected && window.db.tablesReady) {
+        statusTag.className = "supabase-badge connected";
+        statusTag.textContent = "🟢 Live Connected";
+        statusDetail.textContent = `Connected to Supabase PostgreSQL with ${window.db.reportsCache.length} synchronized reports.`;
+      } else if (window.db.supabaseConnected && !window.db.tablesReady) {
+        statusTag.className = "supabase-badge pending";
+        statusTag.textContent = "🟡 Schema Pending";
+        statusDetail.textContent = "Connected to Supabase! Please execute supabase_schema.sql in the Supabase Dashboard SQL Editor to activate tables.";
+      } else {
+        statusTag.className = "supabase-badge disconnected";
+        statusTag.textContent = "⚪ Disconnected";
+        statusDetail.textContent = window.db.lastSyncError || "Supabase not connected. Verify your URL & Publishable Key.";
+      }
+    }
+
+    const testBtn = document.getElementById("btn-test-supabase");
+    if (testBtn) {
+      testBtn.onclick = async () => {
+        testBtn.disabled = true;
+        testBtn.textContent = "Testing...";
+        const res = await window.checkSupabaseConnection();
+        testBtn.disabled = false;
+        testBtn.textContent = "🔍 Test Connection";
+
+        if (statusTag && statusDetail) {
+          if (res.connected && res.tablesFound) {
+            statusTag.className = "supabase-badge connected";
+            statusTag.textContent = "🟢 Verified Live";
+            statusDetail.textContent = "Supabase REST & PostgreSQL tables verified successfully!";
+          } else if (res.connected && !res.tablesFound) {
+            statusTag.className = "supabase-badge pending";
+            statusTag.textContent = "🟡 Pending Migration";
+            statusDetail.textContent = "Connected to Supabase! Tables pending — please run supabase_schema.sql in SQL Editor.";
+          } else {
+            statusTag.className = "supabase-badge disconnected";
+            statusTag.textContent = "🔴 Failed";
+            statusDetail.textContent = res.error || "Connection failed.";
+          }
+        }
+      };
+    }
+
     const saveBtn = document.getElementById("btn-save-supabase");
-    saveBtn.onclick = () => {
+    saveBtn.onclick = async () => {
       const url = document.getElementById("supabase-url-input").value;
       const key = document.getElementById("supabase-key-input").value;
       const enabled = document.getElementById("supabase-enabled-checkbox").checked;
       window.db.saveSupabaseConfig(url, key, enabled);
       modal.classList.add("hidden");
       this.showPointsToast(0, "Supabase Configuration Saved");
+      await window.db.syncWithSupabase();
+      this.updateSupabaseBadge();
     };
 
     modal.classList.remove("hidden");

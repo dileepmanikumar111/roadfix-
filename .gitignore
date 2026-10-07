@@ -1,0 +1,11 @@
+# RoadFix Git Ignore
+.env
+.env.local
+.env.*.local
+*.log
+__pycache__/
+.vscode/
+.idea/
+.DS_Store
+dist/
+node_modules/

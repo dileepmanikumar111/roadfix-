@@ -549,6 +549,22 @@ class RoadFixApp {
         p.classList.remove("active");
       }
     });
+
+    // Auto populate helpful title and description if blank
+    const titleInput = document.getElementById("report-title-input");
+    const descInput = document.getElementById("report-desc-input");
+    if (titleInput && (!titleInput.value || titleInput.value.trim() === "")) {
+      if (category === "deep_crater") {
+        titleInput.value = "Hazardous Deep Crater near Intersection";
+      } else if (category === "waterlogged_pothole") {
+        titleInput.value = "Waterlogged Road Crater with Hidden Depth";
+      } else {
+        titleInput.value = "Dangerous Pothole on Commuter Corridor";
+      }
+    }
+    if (descInput && (!descInput.value || descInput.value.trim() === "")) {
+      descInput.value = "Deep road surface erosion with broken aggregate edges. Immediate skidding and rim damage hazard for vehicles.";
+    }
   }
 
   displayPhotoPreview(src) {

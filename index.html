@@ -19,8 +19,11 @@
 
     <!-- Prototype Header Bar -->
     <div class="prototype-disclaimer-bar">
-      <span class="prototype-tag" data-i18n="prototypeBadge">Prototype • Demonstration Data</span>
-      <span style="font-size: 11px; color: var(--color-text-muted);" data-i18n="ecosystemTag">India Digital Road Safety Ecosystem</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span id="header-data-mode-badge" class="data-mode-badge demo">● DEMO MODE</span>
+        <span style="font-size: 11px; color: var(--color-text-muted);">Civic Road Safety Platform</span>
+      </div>
+      <span style="font-size: 11px; color: var(--color-text-muted);" data-i18n="ecosystemTag">Smart City Road Infrastructure</span>
     </div>
 
     <!-- Top App Navigation Header -->
@@ -30,9 +33,18 @@
           <div class="app-logo-badge">RF</div>
           <div class="brand-text">
             <h1 data-i18n="appName">RoadFix</h1>
-            <p data-i18n="appSubtitle">Smart Pothole Reporting & Road Safety</p>
+            <p data-i18n="appSubtitle">Smart Pothole Reporting & Road Safety Platform</p>
           </div>
         </div>
+
+        <!-- Desktop Navigation Menu -->
+        <nav class="desktop-nav-menu" id="desktop-nav-menu">
+          <button class="desktop-nav-link active" data-tab="home" id="nav-desktop-home">Home</button>
+          <button class="desktop-nav-link" data-tab="map" id="nav-desktop-map">Map</button>
+          <button class="desktop-nav-link desktop-nav-report" data-tab="report" id="nav-desktop-report">+ Report</button>
+          <button class="desktop-nav-link" data-tab="myreports" id="nav-desktop-myreports">My Reports</button>
+          <button class="desktop-nav-link" id="nav-desktop-about">About</button>
+        </nav>
 
         <div class="header-actions">
           <!-- City Selector -->
@@ -58,6 +70,11 @@
           <button id="notif-toggle-btn" class="icon-btn" title="Notifications" aria-label="Notifications">
             🔔
             <span id="notif-unread-count" class="unread-badge hidden">0</span>
+          </button>
+
+          <!-- Profile / Account Button -->
+          <button id="header-profile-btn" class="icon-btn" title="Profile / Account" aria-label="Profile">
+            👤
           </button>
         </div>
       </div>
@@ -106,13 +123,13 @@
 
       <!-- Modern Civic Hero Card -->
       <section class="hero-card">
-        <h2 class="hero-title" data-i18n="heroTitle">Make your road safer.</h2>
+        <h2 class="hero-title" data-i18n="heroTitle">Make Your Roads Safer</h2>
         <p class="hero-desc" data-i18n="heroDesc">
-          Found a pothole, broken road or dangerous hazard? Report it in seconds with AI detection and track repair progress transparently.
+          Report potholes. Track repairs. Protect your community.
         </p>
         <div class="hero-btn-row">
           <button id="hero-report-btn" class="btn-primary">
-            📸 <span data-i18n="reportPotholeBtn">REPORT ROAD HAZARD</span>
+            📸 <span data-i18n="reportPotholeBtn">Report a Pothole</span>
           </button>
           <button id="hero-map-btn" class="btn-secondary">
             🗺️ <span data-i18n="exploreMapBtn">Explore Road Hazards</span>
@@ -129,19 +146,19 @@
         <div class="stats-grid">
           <div class="stat-card">
             <div id="home-stat-total" class="stat-value">--</div>
-            <div class="stat-label" data-i18n="statsTotal">Open Hazards</div>
+            <div class="stat-label">Total Reports</div>
           </div>
           <div class="stat-card">
             <div id="home-stat-critical" class="stat-value" style="color: var(--color-danger);">--</div>
-            <div class="stat-label" data-i18n="statsCritical">Critical Hazards</div>
+            <div class="stat-label">Critical Hazards</div>
           </div>
           <div class="stat-card">
             <div id="home-stat-repaired" class="stat-value" style="color: var(--color-green);">--</div>
-            <div class="stat-label" data-i18n="statsRepaired">Resolved</div>
+            <div class="stat-label">Repaired & Verified</div>
           </div>
           <div class="stat-card">
             <div id="home-stat-time" class="stat-value">36h</div>
-            <div class="stat-label" data-i18n="statsAvgTime">Avg Response</div>
+            <div class="stat-label">Avg. Fix Time</div>
           </div>
         </div>
 
@@ -217,9 +234,12 @@
         </span>
       </div>
 
-      <!-- Map Search Bar -->
-      <div style="display: flex; gap: 8px;">
-        <input type="text" id="map-search-input" class="form-input" placeholder="🔍 Search roads, localities or ticket ID..." style="background: #FFFFFF;" />
+      <!-- Map Search Bar & Current Location Button -->
+      <div class="map-search-row">
+        <input type="text" id="map-search-input" class="form-input" placeholder="🔍 Search roads, localities or ticket ID..." style="background: #FFFFFF; flex: 1;" />
+        <button type="button" id="btn-map-my-location" class="map-center-btn" title="Center on My GPS Location">
+          📍 <span>My Location</span>
+        </button>
       </div>
 
       <!-- Map Filter Pills -->
@@ -227,26 +247,35 @@
         <button class="filter-pill active" data-map-filter="all">All</button>
         <button class="filter-pill" data-map-filter="critical">Critical</button>
         <button class="filter-pill" data-map-filter="high">High</button>
+        <button class="filter-pill" data-map-filter="medium">Medium</button>
         <button class="filter-pill" data-map-filter="pending">Active</button>
         <button class="filter-pill" data-map-filter="closed">Resolved</button>
+      </div>
+
+      <!-- Map Legend Bar -->
+      <div class="map-legend-bar">
+        <span>🔴 Critical</span>
+        <span>🟠 High</span>
+        <span>🟡 Medium</span>
+        <span>🟢 Repaired</span>
       </div>
 
       <!-- Map Element -->
       <div id="map-container"></div>
     </section>
 
-    <!-- 3. REPORT WORKFLOW VIEW (GUIDED 3-STEP FLOW) -->
+    <!-- 3. REPORT WORKFLOW VIEW (GUIDED 4-STEP FLOW) -->
     <section id="view-report" class="view-container hidden">
       <div>
         <h2 style="font-size: 20px; font-weight: 800; color: var(--color-deep-blue);" data-i18n="reportPotholeBtn">Report a Road Hazard</h2>
-        <p style="font-size: 12px; color: var(--color-text-muted);">Guided 3-Step Flow: Capture • Location • RoadVision AI Analysis</p>
+        <p style="font-size: 12px; color: var(--color-text-muted);">Guided 4-Step Flow: Photo • Location • AI Analysis • Review & Submit</p>
       </div>
 
-      <!-- 3-Step Guide Header -->
+      <!-- 4-Step Guide Header -->
       <div class="report-guide-stepper">
         <div id="guide-step-1" class="guide-step-item active">
           <span class="guide-step-num">1</span>
-          <span>Capture</span>
+          <span>Photo</span>
         </div>
         <span style="color: var(--color-border);">→</span>
         <div id="guide-step-2" class="guide-step-item">
@@ -256,24 +285,45 @@
         <span style="color: var(--color-border);">→</span>
         <div id="guide-step-3" class="guide-step-item">
           <span class="guide-step-num">3</span>
-          <span>AI & Submit</span>
+          <span>AI Analysis</span>
+        </div>
+        <span style="color: var(--color-border);">→</span>
+        <div id="guide-step-4" class="guide-step-item">
+          <span class="guide-step-num">4</span>
+          <span>Review</span>
         </div>
       </div>
 
       <div class="report-form-card">
         <form id="pothole-report-form">
 
-          <!-- STEP 1: CAPTURE -->
-          <div id="report-step-1-container">
+          <!-- STEP 1: PHOTO -->
+          <div id="report-step-1-container" class="report-step-container">
             <div class="form-group">
-              <label class="form-label">Step 1 — Capture Road Hazard Photo</label>
+              <label class="form-label">Step 1 — Upload Road Photo</label>
               <div class="photo-upload-zone" onclick="document.getElementById('report-photo-input').click();">
                 <span style="font-size: 32px;">📷</span>
                 <p style="font-size: 13px; font-weight: 700; color: var(--color-deep-blue); margin-top: 4px;">
-                  Tap to Take Photo / Upload Evidence
+                  Tap to Take Photo or Upload Road Evidence
                 </p>
-                <span style="font-size: 11px; color: var(--color-text-muted);">Compressed automatically before AI analysis</span>
-                <input type="file" id="report-photo-input" accept="image/*" style="display: none;" />
+                <span style="font-size: 11px; color: var(--color-text-muted);">Supports JPG, PNG, and Mobile Camera</span>
+                <input type="file" id="report-photo-input" accept="image/jpeg,image/png,image/webp" style="display: none;" />
+                <input type="file" id="report-camera-input" accept="image/*" capture="environment" style="display: none;" />
+              </div>
+
+              <!-- Action buttons for Photo choice -->
+              <div class="photo-buttons-row">
+                <button type="button" id="btn-choose-photo" class="btn-upload-choice">
+                  📁 Choose Photo
+                </button>
+                <button type="button" id="btn-take-photo" class="btn-upload-choice" style="border-color: var(--color-saffron); color: #B45309;">
+                  📷 Take Photo
+                </button>
+              </div>
+
+              <!-- Photo file validation error message -->
+              <div id="photo-validation-error" class="hidden" style="background: #FEE2E2; color: #991B1B; border: 1px solid #FECDD3; border-radius: var(--radius-sm); padding: 8px 12px; font-size: 11.5px; margin-top: 8px;">
+                Invalid file. Please select a valid JPG or PNG image under 15MB.
               </div>
 
               <!-- Verified Demo Images Tray -->
@@ -313,80 +363,154 @@
                 <div class="category-pill" data-category="open_manhole" data-i18n="categoryManhole">Open Manhole</div>
               </div>
             </div>
+
+            <div class="report-step-nav-row">
+              <button type="button" id="btn-step1-next" class="btn-primary" style="margin-left: auto;">
+                Next: Location →
+              </button>
+            </div>
           </div>
 
           <!-- STEP 2: LOCATION -->
-          <div id="report-step-2-container" style="border-top: 1px solid var(--color-border-subtle); padding-top: 16px;">
+          <div id="report-step-2-container" class="report-step-container hidden">
             <div class="form-group">
-              <label class="form-label">Step 2 — Location Detected</label>
-              <div style="background: #F8FAFC; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px;">
+              <label class="form-label">Step 2 — Your Location</label>
+              <div style="background: #F8FAFC; border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px;">
                 <div style="display: flex; align-items: flex-start; gap: 8px;">
-                  <span style="font-size: 18px;">📍</span>
+                  <span style="font-size: 20px;">📍</span>
                   <div style="flex: 1;">
-                    <div id="report-location-readable" style="font-size: 13.5px; font-weight: 700; color: var(--color-deep-blue);">
+                    <div id="report-location-readable" style="font-size: 14px; font-weight: 700; color: var(--color-deep-blue); margin-bottom: 4px;">
                       Hitec City Cyber Towers Road, Hyderabad
                     </div>
-                    <span style="font-size: 11px; color: var(--color-green); font-weight: 700; display: inline-flex; align-items: center; gap: 4px; margin-top: 2px;">
+                    <div style="font-size: 11.5px; color: #475569; margin-bottom: 4px;">
+                      <strong>Coordinates:</strong> Lat <span id="report-loc-lat">17.4485</span>, Lng <span id="report-loc-lng">78.3772</span>
+                    </div>
+                    <span id="report-gps-status" style="font-size: 11px; color: var(--color-green); font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
                       ✓ GPS Accuracy: High Lock
                     </span>
                   </div>
-                  <button type="button" id="btn-refresh-location" class="btn-secondary dark" style="padding: 4px 8px; font-size: 11px;">
-                    Refresh
+                </div>
+
+                <!-- Friendly error notice if location is denied -->
+                <div id="location-denied-box" class="hidden" style="margin-top: 10px; background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; border-radius: var(--radius-sm); padding: 8px 10px; font-size: 11px;">
+                  Location access is disabled. You can manually select your location.
+                </div>
+
+                <!-- Buttons for Location Control -->
+                <div style="display: flex; gap: 8px; margin-top: 12px;">
+                  <button type="button" id="btn-use-current-loc" class="btn-primary" style="flex: 1; justify-content: center; font-size: 11.5px; padding: 7px 10px;">
+                    📍 Use Current Location
+                  </button>
+                  <button type="button" id="btn-change-loc" class="btn-secondary dark" style="flex: 1; justify-content: center; font-size: 11.5px; padding: 7px 10px;">
+                    ✏️ Change Location
                   </button>
                 </div>
 
                 <!-- Hidden form input for submission -->
                 <input type="hidden" id="report-location-input" />
-
-                <!-- Expandable Technical Details Drawer -->
-                <details style="margin-top: 8px; font-size: 11px; color: var(--color-text-muted);">
-                  <summary style="cursor: pointer; font-weight: 600; color: var(--color-ashoka-blue);">View Technical Coordinates</summary>
-                  <div id="location-tech-details" style="padding: 6px 0; line-height: 1.5; font-family: var(--font-mono); font-size: 10.5px;">
-                    Lat: 17.4504, Lng: 78.3808 • Ward 104 • Signal approach
-                  </div>
-                </details>
               </div>
+            </div>
+
+            <!-- Optional Manual Landmark / Road Refinement -->
+            <div class="form-group">
+              <label class="form-label">Road or Landmark (Optional Fine-Tuning)</label>
+              <input type="text" id="report-road-input" class="form-input" placeholder="e.g. Near Cyber Towers Signal Approach" />
+            </div>
+
+            <div class="report-step-nav-row">
+              <button type="button" id="btn-step2-back" class="btn-secondary dark">
+                ← Back to Photo
+              </button>
+              <button type="button" id="btn-step2-next" class="btn-primary">
+                Next: AI Analysis →
+              </button>
             </div>
           </div>
 
-          <!-- STEP 3: ROADVISION AI ANALYSIS & SUBMISSION -->
-          <div id="report-step-3-container" style="border-top: 1px solid var(--color-border-subtle); padding-top: 16px;">
-            <label class="form-label">Step 3 — RoadVision AI Analysis & Details</label>
+          <!-- STEP 3: AI ANALYSIS -->
+          <div id="report-step-3-container" class="report-step-container hidden">
+            <label class="form-label">Step 3 — AI Road Analysis</label>
 
             <!-- AI Animated Checklist -->
             <div id="ai-checklist-card" class="ai-checklist-card">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <strong style="font-size: 12px; color: var(--color-deep-blue);">RoadVision AI Assessment</strong>
+                <strong style="font-size: 12px; color: var(--color-deep-blue);">AI Road Analysis</strong>
                 <span id="ai-status-badge" class="status-pill status-ai_verified">Ready</span>
               </div>
-              <div class="ai-step-row"><span class="ai-step-check">✓</span> <span>Detecting road surface pavement</span></div>
-              <div class="ai-step-row"><span class="ai-step-check">✓</span> <span>Identifying cavity boundaries & edges</span></div>
-              <div class="ai-step-row"><span class="ai-step-check">✓</span> <span>Estimating depth & vehicle risk</span></div>
-              <div class="ai-step-row"><span class="ai-step-check">✓</span> <span>Calculating multi-factor priority score</span></div>
+              <div class="ai-step-row"><span class="ai-step-check">✓</span> <span>Pothole detected</span></div>
+              <div class="ai-step-row"><span class="ai-step-check">✓</span> <span id="ai-check-severity">Severity: Critical</span></div>
+              <div class="ai-step-row"><span class="ai-step-check">✓</span> <span>Estimated risk: High</span></div>
+              <div class="ai-step-row"><span class="ai-step-check">✓</span> <span>Road obstruction: High</span></div>
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px dashed #BFDBFE; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 12px; font-weight: 700; color: var(--color-deep-blue);">Priority Score</span>
+                <span id="ai-check-priority" style="font-size: 13px; font-weight: 800; color: #D32F2F; background: #FEE2E2; padding: 2px 8px; border-radius: 4px;">94 / 100</span>
+              </div>
             </div>
 
             <!-- Report Title Input -->
             <div class="form-group" style="margin-top: 14px;">
-              <label class="form-label">Report Title</label>
-              <input type="text" id="report-title-input" class="form-input" placeholder="E.g. Hazardous deep crater near Cyber Towers" required />
+              <label class="form-label">Hazard Title</label>
+              <input type="text" id="report-title-input" class="form-input" placeholder="E.g. Large Road Pothole" required />
             </div>
 
             <!-- Description Input -->
             <div class="form-group">
-              <label class="form-label" data-i18n="descriptionLabel">Problem Description</label>
-              <textarea id="report-desc-input" class="form-textarea" rows="2" placeholder="Describe depth and danger to two-wheelers..." required></textarea>
+              <label class="form-label" data-i18n="descriptionLabel">Description</label>
+              <textarea id="report-desc-input" class="form-textarea" rows="2" placeholder="Describe depth and hazard to two-wheelers..." required></textarea>
             </div>
 
-            <!-- Submission Summary Bar -->
-            <div style="background: var(--color-saffron-soft); border: 1px solid #FED7AA; border-radius: var(--radius-sm); padding: 8px 12px; font-size: 11.5px; color: #9A3412; margin-bottom: 14px;">
-              ✓ Photo Attached • Location Verified • AI Diagnostic Armed
+            <div class="report-step-nav-row">
+              <button type="button" id="btn-step3-back" class="btn-secondary dark">
+                ← Back to Location
+              </button>
+              <button type="button" id="btn-step3-next" class="btn-primary">
+                Next: Review & Submit →
+              </button>
+            </div>
+          </div>
+
+          <!-- STEP 4: REVIEW & SUBMIT -->
+          <div id="report-step-4-container" class="report-step-container hidden">
+            <label class="form-label">Step 4 — Review & Submit</label>
+
+            <!-- Complete Summary Card -->
+            <div class="review-summary-card">
+              <div style="display: flex; gap: 12px; margin-bottom: 12px;">
+                <img id="review-summary-img" src="assets/images/pothole_crater.jpg" style="width: 90px; height: 75px; object-fit: cover; border-radius: var(--radius-sm);" alt="Preview" />
+                <div style="flex: 1;">
+                  <h4 id="review-summary-title" style="font-size: 14px; font-weight: 800; color: var(--color-deep-blue); margin: 0 0 4px 0;">Large Road Pothole</h4>
+                  <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+                    <span id="review-summary-severity" class="report-badge severity-badge badge-critical" style="position: static; font-size: 10px;">CRITICAL</span>
+                    <span id="review-summary-priority" style="font-size: 11px; font-weight: 700; color: #000080; background: #DBEAFE; padding: 2px 6px; border-radius: 4px;">Priority 94/100</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="review-summary-row">
+                <span class="review-summary-label">Hazard Type:</span>
+                <span id="review-summary-category" class="review-summary-val">Deep Crater</span>
+              </div>
+              <div class="review-summary-row">
+                <span class="review-summary-label">Location:</span>
+                <span id="review-summary-location" class="review-summary-val">Hitec City Cyber Towers Road, Hyderabad</span>
+              </div>
+              <div class="review-summary-row">
+                <span class="review-summary-label">Description:</span>
+                <span id="review-summary-desc" class="review-summary-val" style="font-weight: 400; color: #475569;">Road crater causing rim damage</span>
+              </div>
             </div>
 
             <!-- Primary Saffron Submit Action -->
             <button type="submit" id="submit-report-btn" class="btn-primary" style="width: 100%; justify-content: center; font-size: 14px; padding: 12px;">
-              🚀 <span data-i18n="submitReportBtn">SUBMIT ROAD HAZARD</span>
+              🚀 <span data-i18n="submitReportBtn">SUBMIT REPORT</span>
             </button>
             <div id="submit-status-text" style="font-size: 11px; text-align: center; margin-top: 6px; color: var(--color-deep-blue); font-weight: 700;"></div>
+
+            <div class="report-step-nav-row" style="margin-top: 8px;">
+              <button type="button" id="btn-step4-back" class="btn-secondary dark">
+                ← Back to AI Analysis
+              </button>
+            </div>
           </div>
 
         </form>
@@ -530,6 +654,30 @@
         </span>
       </div>
 
+      <!-- Authority KPI Summary Cards -->
+      <div class="authority-kpi-grid">
+        <div class="stat-card">
+          <div id="auth-stat-assigned" class="stat-value">--</div>
+          <div class="stat-label">Assigned Reports</div>
+        </div>
+        <div class="stat-card">
+          <div id="auth-stat-critical" class="stat-value" style="color: var(--color-danger);">--</div>
+          <div class="stat-label">Critical Hazards</div>
+        </div>
+        <div class="stat-card">
+          <div id="auth-stat-pending" class="stat-value" style="color: var(--color-saffron);">--</div>
+          <div class="stat-label">Pending Repairs</div>
+        </div>
+        <div class="stat-card">
+          <div id="auth-stat-completed" class="stat-value" style="color: var(--color-green);">--</div>
+          <div class="stat-label">Completed Repairs</div>
+        </div>
+        <div class="stat-card">
+          <div id="auth-stat-time" class="stat-value" style="color: var(--color-deep-blue);">28h</div>
+          <div class="stat-label">Avg. Repair Time</div>
+        </div>
+      </div>
+
       <div id="authority-triage-list">
         <!-- Populated dynamically via JS -->
       </div>
@@ -552,16 +700,24 @@
       <!-- KPI Summary Cards -->
       <div class="stats-grid">
         <div class="stat-card">
+          <div id="admin-total-users" class="stat-value">24</div>
+          <div class="stat-label">Total Users</div>
+        </div>
+        <div class="stat-card">
           <div id="admin-total-reports" class="stat-value">--</div>
           <div class="stat-label">Total Reports</div>
         </div>
         <div class="stat-card">
           <div id="admin-critical-hazards" class="stat-value" style="color: var(--color-danger);">--</div>
-          <div class="stat-label">Critical</div>
+          <div class="stat-label">Critical Hazards</div>
+        </div>
+        <div class="stat-card">
+          <div id="admin-open-repairs" class="stat-value" style="color: var(--color-saffron);">--</div>
+          <div class="stat-label">Open Repairs</div>
         </div>
         <div class="stat-card">
           <div id="admin-repaired-hazards" class="stat-value" style="color: var(--color-green);">--</div>
-          <div class="stat-label">Repaired</div>
+          <div class="stat-label">Resolved Reports</div>
         </div>
         <div class="stat-card">
           <div id="admin-resolution-rate" class="stat-value" style="color: var(--color-deep-blue);">--</div>
@@ -569,30 +725,47 @@
         </div>
       </div>
 
-      <!-- SYSTEM HEALTH & BACKEND STATUS CARD (Isolated from Citizen screens) -->
+      <!-- SYSTEM HEALTH (Section 21: Isolated from Citizen UI) -->
       <div class="hero-card" style="border-left: 6px solid var(--color-deep-blue); margin-top: 4px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <div>
             <h4 style="font-size: 14px; font-weight: 800; color: var(--color-deep-blue);">
-              🖥️ System Health & Supabase Cloud Status
+              🖥️ System Health
             </h4>
-            <p style="font-size: 11.5px; color: var(--color-text-muted);">PostgreSQL connection & table synchronization</p>
+            <p style="font-size: 11.5px; color: var(--color-text-muted);">Platform service runtime & infrastructure diagnostics</p>
           </div>
           <span id="admin-supabase-status-pill" class="supabase-badge connected">Live</span>
         </div>
 
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px;">
-          <div style="background: #F8FAFC; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 12px;">
-            <span style="font-size: 10.5px; color: var(--color-text-muted);">Backend Provider:</span>
-            <strong style="display: block; font-size: 12px; color: var(--color-deep-blue);">Supabase PostgreSQL</strong>
+        <!-- 6-Item Status Grid as required in Section 21 -->
+        <div class="system-health-grid">
+          <div class="health-item">
+            <span>Frontend</span>
+            <strong id="health-frontend" class="health-status online">● Online</strong>
           </div>
-          <div style="background: #F8FAFC; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 12px;">
-            <span style="font-size: 10.5px; color: var(--color-text-muted);">Database Schema:</span>
-            <strong id="admin-tables-status-text" style="display: block; font-size: 12px; color: var(--color-ashoka-blue);">Ready</strong>
+          <div class="health-item">
+            <span>Backend</span>
+            <strong id="health-backend" class="health-status online">● Online</strong>
+          </div>
+          <div class="health-item">
+            <span>Supabase</span>
+            <strong id="health-supabase" class="health-status connected">● Connected</strong>
+          </div>
+          <div class="health-item">
+            <span>Map Service</span>
+            <strong id="health-map" class="health-status connected">● Connected</strong>
+          </div>
+          <div class="health-item">
+            <span>AI Service</span>
+            <strong id="health-ai" class="health-status connected">● Connected</strong>
+          </div>
+          <div class="health-item">
+            <span>Storage</span>
+            <strong id="health-storage" class="health-status connected">● Connected</strong>
           </div>
         </div>
 
-        <div style="display: flex; gap: 8px;">
+        <div style="display: flex; gap: 8px; margin-top: 10px;">
           <button id="btn-admin-test-connection" class="btn-secondary dark" style="flex: 1; justify-content: center; font-size: 11.5px;">
             🔍 Test Connection
           </button>
@@ -949,6 +1122,98 @@
           Save Settings
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- 9. Change Location Modal -->
+  <div id="change-location-modal" class="modal-overlay hidden">
+    <div class="modal-sheet" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 style="font-size: 16px; font-weight: 800; color: var(--color-deep-blue);">Change Your Location</h3>
+        <button class="btn-close" onclick="document.getElementById('change-location-modal').classList.add('hidden');">✕</button>
+      </div>
+      <p style="font-size: 12px; color: var(--color-text-muted); margin-bottom: 12px;">
+        Select your city or manually adjust coordinates for accurate road hazard reporting.
+      </p>
+
+      <div class="form-group">
+        <label class="form-label">City / Region</label>
+        <select id="modal-city-select" class="form-input">
+          <option value="Hyderabad">Hyderabad (Telangana)</option>
+          <option value="Bengaluru">Bengaluru (Karnataka)</option>
+          <option value="Mumbai">Mumbai (Maharashtra)</option>
+          <option value="Delhi">Delhi (NCR)</option>
+          <option value="Chennai">Chennai (Tamil Nadu)</option>
+          <option value="Pune">Pune (Maharashtra)</option>
+          <option value="Kolkata">Kolkata (West Bengal)</option>
+          <option value="Ahmedabad">Ahmedabad (Gujarat)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Road or Locality</label>
+        <input type="text" id="modal-road-input" class="form-input" placeholder="e.g. Banjara Hills Road No 12" />
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;" class="form-group">
+        <div>
+          <label class="form-label">Latitude</label>
+          <input type="number" step="0.0001" id="modal-lat-input" class="form-input" value="17.4485" />
+        </div>
+        <div>
+          <label class="form-label">Longitude</label>
+          <input type="number" step="0.0001" id="modal-lng-input" class="form-input" value="78.3772" />
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-top: 14px;">
+        <button type="button" class="btn-secondary dark" style="flex: 1; justify-content: center;" onclick="document.getElementById('change-location-modal').classList.add('hidden');">
+          Cancel
+        </button>
+        <button type="button" id="btn-apply-custom-location" class="btn-primary" style="flex: 1; justify-content: center;">
+          Apply Location
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10. About Modal -->
+  <div id="about-modal" class="modal-overlay hidden">
+    <div class="modal-sheet" style="max-width: 480px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="app-logo-badge" style="width: 28px; height: 28px; font-size: 12px;">RF</div>
+          <div>
+            <h3 style="font-size: 16px; font-weight: 800; color: var(--color-deep-blue); margin: 0;">RoadFix Platform</h3>
+            <p style="font-size: 11px; color: var(--color-text-muted); margin: 0;">Smart Pothole Reporting & Road Safety Platform</p>
+          </div>
+        </div>
+        <button class="btn-close" onclick="document.getElementById('about-modal').classList.add('hidden');">✕</button>
+      </div>
+
+      <div style="font-size: 12.5px; color: #334155; line-height: 1.5; margin: 12px 0;">
+        <p style="margin-bottom: 10px;">
+          <strong>RoadFix</strong> is a next-generation civic road safety platform connecting citizens, municipal authorities, and road infrastructure engineers to eliminate potholes and hazardous road conditions across urban corridors.
+        </p>
+
+        <h5 style="font-size: 12.5px; font-weight: 800; color: var(--color-deep-blue); margin: 10px 0 6px 0;">Core Features:</h5>
+        <ul style="padding-left: 18px; margin: 0 0 12px 0;">
+          <li><strong>Citizen Reporting:</strong> One-tap GPS location capture with mobile camera evidence.</li>
+          <li><strong>RoadVision AI:</strong> Automated distress classification, cavity boundary detection, and severity ranking.</li>
+          <li><strong>Interactive GIS Map:</strong> Leaflet mapping with real-time hazard markers, zoom controls, and proximity alerts.</li>
+          <li><strong>Municipal Triage & Dispatch:</strong> Priority score calculation, SLA tracking, and repair squad assignment.</li>
+          <li><strong>Verified Quality:</strong> Two-sided verification combining engineer photographic proof and citizen approval.</li>
+          <li><strong>Civic Gamification:</strong> Civic points and contribution badges rewarding active road guardians.</li>
+        </ul>
+
+        <div style="background: #F8FAFC; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 11px; color: var(--color-text-muted);">
+          <span>Production-grade PostgreSQL backend powered by Supabase. GIS tile engine configured with OpenStreetMap and CARTO integration.</span>
+        </div>
+      </div>
+
+      <button type="button" class="btn-primary" style="width: 100%; justify-content: center;" onclick="document.getElementById('about-modal').classList.add('hidden');">
+        Close
+      </button>
     </div>
   </div>
 

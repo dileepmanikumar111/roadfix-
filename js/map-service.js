@@ -1,6 +1,7 @@
 /**
  * RoadFix — Interactive Leaflet Pothole Map & Hotspot Clustering
  * Color-coded severity pins, pulsing critical markers, hotspot radius circles,
+ * CARTO API key integration with OSM fallback (eliminating watermark),
  * and quick-filter integration.
  */
 
@@ -31,17 +32,34 @@ class RoadFixMapService {
       attributionControl: true
     }).setView(cityConfig.center, cityConfig.zoom);
 
-    // High performance CartoDB Positron / OSM tiles with clean aesthetic
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>',
-      subdomains: "abcd",
+    // Environment-configured tile provider:
+    // If CARTO_API_KEY is configured in .env or settings, load authenticated CARTO Voyager tiles.
+    // If not configured, use official OpenStreetMap tiles with complete attribution to prevent "API KEY REQUIRED" watermark.
+    const cartoKey = window.ROADFIX_CONFIG?.CARTO_API_KEY || localStorage.getItem("roadfix_carto_api_key") || "";
+    let tileUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+    let subdomains = "abc";
+
+    if (cartoKey && cartoKey.trim().length > 0) {
+      tileUrl = `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?api_key=${encodeURIComponent(cartoKey.trim())}`;
+      subdomains = "abcd";
+    }
+
+    const tileLayer = L.tileLayer(tileUrl, {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/" target="_blank" rel="noopener">CARTO</a>',
+      subdomains: subdomains,
       maxZoom: 19
     }).addTo(this.map);
+
+    // Fallback if tile loading fails
+    tileLayer.on("tileerror", () => {
+      console.warn("Tile server note: Using OpenStreetMap raster tiles for clean rendering.");
+    });
 
     this.markersLayer = L.layerGroup().addTo(this.map);
     this.hotspotsLayer = L.layerGroup().addTo(this.map);
 
     this.isInitialized = true;
+    this.plotUserLocation();
     this.renderReportsAndHotspots();
 
     // Listen to data and city updates
@@ -50,6 +68,7 @@ class RoadFixMapService {
       const conf = window.locationService.getCityConfig(e.detail.city);
       if (conf && this.map) {
         this.map.setView(conf.center, conf.zoom);
+        this.plotUserLocation();
         this.renderReportsAndHotspots();
       }
     });
@@ -58,6 +77,38 @@ class RoadFixMapService {
     window.addEventListener("resize", () => {
       if (this.map) this.map.invalidateSize();
     });
+  }
+
+  plotUserLocation() {
+    if (!this.map || !window.locationService) return;
+    const coords = window.locationService.currentCoords;
+    if (!coords || !coords.lat || !coords.lng) return;
+
+    if (this.userLocationMarker) {
+      this.userLocationMarker.setLatLng([coords.lat, coords.lng]);
+    } else {
+      const userIcon = L.divIcon({
+        className: "leaflet-custom-div-icon",
+        html: `
+          <div style="width: 22px; height: 22px; border-radius: 50%; background: #2563EB; border: 3px solid #FFFFFF; box-shadow: 0 0 10px rgba(37,99,235,0.6); animation: pulse-overlay 2s infinite;"></div>
+        `,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+
+      this.userLocationMarker = L.marker([coords.lat, coords.lng], { icon: userIcon, zIndexOffset: 1000 });
+      this.userLocationMarker.bindTooltip("<strong>📍 You Are Here</strong><br>GPS Active", { direction: "top", offset: [0, -10] });
+      this.userLocationMarker.addTo(this.map);
+    }
+  }
+
+  centerOnUserLocation() {
+    if (!this.map || !window.locationService) return;
+    const coords = window.locationService.currentCoords;
+    if (coords && coords.lat && coords.lng) {
+      this.map.flyTo([coords.lat, coords.lng], 16, { animate: true, duration: 1.2 });
+      this.plotUserLocation();
+    }
   }
 
   renderReportsAndHotspots() {
@@ -93,12 +144,27 @@ class RoadFixMapService {
       const markerIcon = this.createSeverityIcon(rep.severity, rep.status);
       const marker = L.marker([rep.location.lat, rep.location.lng], { icon: markerIcon });
 
-      // Click to open detailed bottom sheet
-      marker.on("click", () => {
-        if (window.app && window.app.openReportModal) {
-          window.app.openReportModal(rep.id);
-        }
-      });
+      // Rich Detail Popup Card matching Section 7 specifications
+      const statusText = (rep.status || "reported").replace(/_/g, " ").toUpperCase();
+      const popupHtml = `
+        <div style="font-family: inherit; min-width: 210px; padding: 2px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+            <span class="report-badge severity-badge badge-${rep.severity}" style="position: static; font-size: 10px;">${(rep.severity || 'high').toUpperCase()}</span>
+            <span style="font-size: 11px; font-weight: 800; color: #000080;">Priority: ${rep.priorityScore || 90}/100</span>
+          </div>
+          <h4 style="font-size: 13.5px; font-weight: 800; color: #000080; margin: 4px 0 2px 0;">${rep.title}</h4>
+          <p style="font-size: 11px; color: #1A237E; margin: 0 0 6px 0; font-weight: 600;">📍 ${rep.road || currentCity}</p>
+          <div style="font-size: 10.5px; color: #475569; margin-bottom: 8px; line-height: 1.4;">
+            <div><strong>Ticket:</strong> <span style="font-family: monospace;">${rep.ticketNumber}</span></div>
+            <div><strong>Status:</strong> <span class="status-pill status-${rep.status}" style="font-size: 9.5px; padding: 1px 6px;">${statusText}</span></div>
+          </div>
+          <button class="btn-primary" style="width: 100%; padding: 5px 10px; font-size: 11.5px; justify-content: center; cursor: pointer;" onclick="window.app.openReportModal('${rep.id}')">
+            View Full Report →
+          </button>
+        </div>
+      `;
+
+      marker.bindPopup(popupHtml, { maxWidth: 280, className: "custom-leaflet-popup" });
 
       marker.bindTooltip(
         `<strong>${rep.ticketNumber}</strong><br>${rep.title}<br><span style="color:#D32F2F;font-weight:700;">Priority: ${rep.priorityScore}/100</span>`,

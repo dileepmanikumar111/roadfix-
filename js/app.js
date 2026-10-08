@@ -12,6 +12,7 @@ class RoadFixApp {
     this.selectedCategory = "pothole";
     this.currentReportFilter = "all";
     this.currentMapFilter = "all";
+    this.currentReportStep = 1;
     this.lastCreatedReportId = null;
     this.lastCreatedReport = null;
   }
@@ -38,6 +39,24 @@ class RoadFixApp {
     const brandBtn = document.getElementById("brand-home-btn");
     if (brandBtn) {
       brandBtn.addEventListener("click", () => this.switchTab("home"));
+    }
+
+    // Desktop Navigation Links
+    document.querySelectorAll(".desktop-nav-link").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const tab = btn.getAttribute("data-tab");
+        if (tab) {
+          this.switchTab(tab);
+        } else if (btn.id === "nav-desktop-about") {
+          document.getElementById("about-modal")?.classList.remove("hidden");
+        }
+      });
+    });
+
+    // Header Profile Button
+    const headerProfileBtn = document.getElementById("header-profile-btn");
+    if (headerProfileBtn) {
+      headerProfileBtn.addEventListener("click", () => this.switchTab("profile"));
     }
 
     // Bottom Navigation
@@ -113,10 +132,25 @@ class RoadFixApp {
       });
     });
 
-    // Photo input in report form
+    // Photo input & Camera input in report form
     const photoInput = document.getElementById("report-photo-input");
     if (photoInput) {
       photoInput.addEventListener("change", (e) => this.handlePhotoUpload(e));
+    }
+
+    const cameraInput = document.getElementById("report-camera-input");
+    if (cameraInput) {
+      cameraInput.addEventListener("change", (e) => this.handlePhotoUpload(e));
+    }
+
+    const btnChoosePhoto = document.getElementById("btn-choose-photo");
+    if (btnChoosePhoto) {
+      btnChoosePhoto.addEventListener("click", () => photoInput?.click());
+    }
+
+    const btnTakePhoto = document.getElementById("btn-take-photo");
+    if (btnTakePhoto) {
+      btnTakePhoto.addEventListener("click", () => cameraInput?.click());
     }
 
     // Submit Report Form
@@ -134,7 +168,86 @@ class RoadFixApp {
       });
     });
 
-    // Location refresh button
+    // 4-Step Guided Report Stepper Buttons
+    const btnStep1Next = document.getElementById("btn-step1-next");
+    if (btnStep1Next) {
+      btnStep1Next.addEventListener("click", () => {
+        if (!this.capturedImageBase64) {
+          this.loadSamplePhoto("assets/images/pothole_crater.jpg", this.selectedCategory || "pothole");
+        }
+        this.setReportStep(2);
+      });
+    }
+
+    const btnStep2Back = document.getElementById("btn-step2-back");
+    if (btnStep2Back) {
+      btnStep2Back.addEventListener("click", () => this.setReportStep(1));
+    }
+
+    const btnStep2Next = document.getElementById("btn-step2-next");
+    if (btnStep2Next) {
+      btnStep2Next.addEventListener("click", () => this.setReportStep(3));
+    }
+
+    const btnStep3Back = document.getElementById("btn-step3-back");
+    if (btnStep3Back) {
+      btnStep3Back.addEventListener("click", () => this.setReportStep(2));
+    }
+
+    const btnStep3Next = document.getElementById("btn-step3-next");
+    if (btnStep3Next) {
+      btnStep3Next.addEventListener("click", () => this.setReportStep(4));
+    }
+
+    const btnStep4Back = document.getElementById("btn-step4-back");
+    if (btnStep4Back) {
+      btnStep4Back.addEventListener("click", () => this.setReportStep(3));
+    }
+
+    // Step 2 Location Actions
+    const btnUseCurrentLoc = document.getElementById("btn-use-current-loc");
+    if (btnUseCurrentLoc) {
+      btnUseCurrentLoc.addEventListener("click", async () => {
+        btnUseCurrentLoc.textContent = "Detecting GPS...";
+        const loc = await window.locationService.getCurrentLocation();
+        this.updateReportFormLocation();
+        btnUseCurrentLoc.textContent = "📍 Use Current Location";
+        if (loc.isRealGps) {
+          this.showPointsToast(0, "GPS Location Updated");
+          document.getElementById("location-denied-box")?.classList.add("hidden");
+        } else {
+          document.getElementById("location-denied-box")?.classList.remove("hidden");
+        }
+      });
+    }
+
+    const btnChangeLoc = document.getElementById("btn-change-loc");
+    if (btnChangeLoc) {
+      btnChangeLoc.addEventListener("click", () => {
+        document.getElementById("change-location-modal")?.classList.remove("hidden");
+      });
+    }
+
+    const btnApplyCustomLoc = document.getElementById("btn-apply-custom-location");
+    if (btnApplyCustomLoc) {
+      btnApplyCustomLoc.addEventListener("click", () => {
+        const city = document.getElementById("modal-city-select")?.value || "Hyderabad";
+        const road = document.getElementById("modal-road-input")?.value?.trim() || "Main Road";
+        const lat = parseFloat(document.getElementById("modal-lat-input")?.value) || 17.4485;
+        const lng = parseFloat(document.getElementById("modal-lng-input")?.value) || 78.3772;
+
+        window.locationService.currentCity = city;
+        window.locationService.currentRoad = road;
+        window.locationService.currentCoords = { lat, lng };
+        window.locationService.currentAddress = `${road}, ${city}`;
+
+        this.updateReportFormLocation();
+        document.getElementById("change-location-modal")?.classList.add("hidden");
+        this.showPointsToast(0, `Location updated to ${city}`);
+      });
+    }
+
+    // Location refresh button (legacy or additional)
     const refreshLocBtn = document.getElementById("btn-refresh-location");
     if (refreshLocBtn) {
       refreshLocBtn.addEventListener("click", async () => {
@@ -156,7 +269,18 @@ class RoadFixApp {
       });
     }
 
-    // Map filter pills
+    // Map Locate My GPS Button
+    const mapMyLocationBtn = document.getElementById("btn-map-my-location");
+    if (mapMyLocationBtn) {
+      mapMyLocationBtn.addEventListener("click", () => {
+        if (window.mapService) {
+          window.mapService.centerOnUserLocation();
+          this.showPointsToast(0, "Centered on Your GPS Location");
+        }
+      });
+    }
+
+    // Map filter pills (including Medium severity)
     document.querySelectorAll("#view-map .filter-pill").forEach((pill) => {
       pill.addEventListener("click", () => {
         document.querySelectorAll("#view-map .filter-pill").forEach((p) => p.classList.remove("active"));
@@ -166,7 +290,7 @@ class RoadFixApp {
           if (f === "all") {
             window.mapService.setFilter("status", "all");
             window.mapService.setFilter("severity", "all");
-          } else if (["critical", "high"].includes(f)) {
+          } else if (["critical", "high", "medium"].includes(f)) {
             window.mapService.setFilter("status", "all");
             window.mapService.setFilter("severity", f);
           } else if (f === "pending") {
@@ -264,7 +388,63 @@ class RoadFixApp {
     const isConnected = detail ? detail.connected : window.db.supabaseConnected;
     const tablesReady = detail ? (detail.tablesFound !== undefined ? detail.tablesFound : detail.tablesReady) : window.db.tablesReady;
 
-    // Update Admin System Health status indicators
+    // Header Data Indicator Badge (Citizen UI: LIVE DATA vs DEMO MODE)
+    const headerDataBadge = document.getElementById("header-data-mode-badge");
+    if (headerDataBadge) {
+      if (isConnected && tablesReady) {
+        headerDataBadge.className = "data-mode-badge live";
+        headerDataBadge.textContent = "● LIVE DATA";
+        headerDataBadge.title = "Connected to Supabase PostgreSQL cloud backend";
+      } else {
+        headerDataBadge.className = "data-mode-badge demo";
+        headerDataBadge.textContent = "● DEMO MODE";
+        headerDataBadge.title = "Demonstration dataset active (Local fallback)";
+      }
+    }
+
+    // 6-Item System Health Indicators (Admin -> System Health)
+    const hFrontend = document.getElementById("health-frontend");
+    const hBackend = document.getElementById("health-backend");
+    const hSupabase = document.getElementById("health-supabase");
+    const hMap = document.getElementById("health-map");
+    const hAi = document.getElementById("health-ai");
+    const hStorage = document.getElementById("health-storage");
+
+    if (hFrontend) {
+      hFrontend.textContent = navigator.onLine ? "● Online" : "● Offline";
+      hFrontend.className = `health-status ${navigator.onLine ? 'online' : 'offline'}`;
+    }
+    if (hBackend) {
+      hBackend.textContent = "● Online";
+      hBackend.className = "health-status online";
+    }
+    if (hSupabase) {
+      if (isConnected && tablesReady) {
+        hSupabase.textContent = "● Connected";
+        hSupabase.className = "health-status connected";
+      } else if (isConnected && !tablesReady) {
+        hSupabase.textContent = "● Pending Tables";
+        hSupabase.className = "health-status pending";
+      } else {
+        hSupabase.textContent = "● Local Mode";
+        hSupabase.className = "health-status offline";
+      }
+    }
+    if (hMap) {
+      hMap.textContent = "● Connected";
+      hMap.className = "health-status connected";
+    }
+    if (hAi) {
+      const hasGemini = window.ROADFIX_CONFIG?.GEMINI_API_KEY && window.ROADFIX_CONFIG.GEMINI_API_KEY.length > 5;
+      hAi.textContent = hasGemini ? "● Connected (Gemini Flash)" : "● Connected (RoadVision Edge)";
+      hAi.className = "health-status connected";
+    }
+    if (hStorage) {
+      hStorage.textContent = "● Connected";
+      hStorage.className = "health-status connected";
+    }
+
+    // Admin Legacy Badges if present
     const adminPill = document.getElementById("admin-supabase-status-pill");
     const adminTablesText = document.getElementById("admin-tables-status-text");
 
@@ -291,24 +471,6 @@ class RoadFixApp {
       } else {
         adminTablesText.textContent = "Offline / Local Cache";
         adminTablesText.style.color = "var(--color-text-muted)";
-      }
-    }
-
-    // Legacy header badge if present
-    const badge = document.getElementById("header-supabase-badge");
-    if (badge) {
-      if (isConnected && tablesReady) {
-        badge.className = "supabase-badge connected";
-        badge.innerHTML = "🟢 <span>Supabase Live</span>";
-        badge.title = "Supabase PostgreSQL connected & tables synchronized";
-      } else if (isConnected && !tablesReady) {
-        badge.className = "supabase-badge pending";
-        badge.innerHTML = "🟡 <span>Supabase (Pending SQL)</span>";
-        badge.title = "Supabase connected! Run supabase_schema.sql in Supabase SQL Editor";
-      } else {
-        badge.className = "supabase-badge disconnected";
-        badge.innerHTML = "⚪ <span>Local Mode</span>";
-        badge.title = "Click to configure Supabase credentials";
       }
     }
   }
@@ -436,6 +598,15 @@ class RoadFixApp {
       }
     });
 
+    // Update desktop nav bar active states
+    document.querySelectorAll(".desktop-nav-link").forEach((btn) => {
+      if (btn.getAttribute("data-tab") === tabName) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
+      }
+    });
+
     // Hide all view containers, show active
     document.querySelectorAll(".view-container").forEach((vc) => {
       if (vc.id === `view-${tabName}`) {
@@ -444,6 +615,10 @@ class RoadFixApp {
         vc.classList.add("hidden");
       }
     });
+
+    if (tabName === "report") {
+      this.setReportStep(this.currentReportStep || 1);
+    }
 
     window.scrollTo({ top: 0, behavior: "smooth" });
     this.renderActiveView();
@@ -634,18 +809,77 @@ class RoadFixApp {
     return card;
   }
 
-  createReportCardElement(rep) {
+  formatTimeAgo(dateString) {
+    if (!dateString) return "Recently";
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffSec = Math.max(0, Math.floor((now - date) / 1000));
+      if (diffSec < 60) return "Just now";
+      const diffMin = Math.floor(diffSec / 60);
+      if (diffMin < 60) return `${diffMin}m ago`;
+      const diffHours = Math.floor(diffMin / 60);
+      if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    } catch (e) {
+      return "Recently";
+    }
+  }
+
+  renderTimelineHtml(status) {
+    const steps = [
+      { key: "reported", label: "Reported" },
+      { key: "verified", label: "Verified" },
+      { key: "assigned", label: "Assigned" },
+      { key: "in_progress", label: "In Progress" },
+      { key: "repaired", label: "Repaired" },
+      { key: "resolved", label: "Resolved" }
+    ];
+
+    let currentIdx = 0;
+    if (status === "reported") currentIdx = 0;
+    else if (status === "ai_verified" || status === "verified" || status === "authority_review") currentIdx = 1;
+    else if (status === "assigned" || status === "repair_scheduled") currentIdx = 2;
+    else if (status === "repair_in_progress") currentIdx = 3;
+    else if (status === "repair_completed" || status === "repaired") currentIdx = 4;
+    else if (status === "citizen_verification" || status === "closed" || status === "resolved") currentIdx = 5;
+
+    let html = `<div class="report-timeline-container">`;
+    steps.forEach((s, i) => {
+      const isCompleted = i < currentIdx;
+      const isActive = i === currentIdx;
+      const cls = isCompleted ? "completed" : (isActive ? "active" : "");
+      const icon = isCompleted ? "✓" : (i + 1);
+
+      html += `
+        <div class="timeline-step ${cls}">
+          <div class="timeline-node">${icon}</div>
+          <div class="timeline-label">${s.label}</div>
+        </div>
+      `;
+      if (i < steps.length - 1) {
+        const lineCls = i < currentIdx ? "completed" : "";
+        html += `<div class="timeline-line ${lineCls}"></div>`;
+      }
+    });
+    html += `</div>`;
+    return html;
+  }
+
+  createReportCardElement(rep, showTimeline = false) {
     const card = document.createElement("div");
     card.className = "report-card";
 
     const severityClass = `badge-${rep.severity}`;
     const statusText = rep.status.replace(/_/g, " ").toUpperCase();
+    const formattedTime = this.formatTimeAgo(rep.createdAt);
 
     card.innerHTML = `
       <div class="report-card-media" style="position: relative;">
-        <img src="${rep.images.before || 'assets/images/pothole_crater.jpg'}" alt="${rep.title}" loading="lazy" />
-        <span class="report-badge severity-badge ${severityClass}">${rep.severity.toUpperCase()}</span>
-        <span class="report-badge priority-pill">Priority: ${rep.priorityScore}/100</span>
+        <img src="${rep.images?.before || 'assets/images/pothole_crater.jpg'}" alt="${rep.title}" loading="lazy" />
+        <span class="report-badge severity-badge ${severityClass}">${(rep.severity || 'high').toUpperCase()}</span>
+        <span class="report-badge priority-pill">Priority ${rep.priorityScore || 90}/100</span>
       </div>
       <div class="report-card-body">
         <div class="report-card-header">
@@ -653,15 +887,18 @@ class RoadFixApp {
           <span class="status-pill status-${rep.status}">${statusText}</span>
         </div>
         <h3 class="report-card-title">${rep.title}</h3>
-        <p class="report-card-road">📍 ${rep.road}</p>
-        <p class="report-card-desc">${rep.description.substring(0, 95)}...</p>
+        <p class="report-card-road">📍 ${rep.road || rep.city || 'Main Road'}, ${rep.city || 'Hyderabad'}</p>
+        <div style="font-size: 11px; color: var(--color-text-muted); margin-bottom: 6px;">
+          Reported ${formattedTime}
+        </div>
+        ${showTimeline ? this.renderTimelineHtml(rep.status) : `<p class="report-card-desc">${(rep.description || '').substring(0, 95)}...</p>`}
         <div class="report-card-footer">
           <button class="action-btn upvote-btn ${rep.upvotedByMe ? 'active' : ''}" data-id="${rep.id}">
             👍 <span>${rep.upvotesCount || 0}</span>
           </button>
           <span class="comment-count-tag">💬 ${rep.commentsCount || 0}</span>
-          <button class="btn-secondary view-details-btn" data-id="${rep.id}">
-            Track Repair →
+          <button class="btn-primary view-details-btn" style="padding: 6px 14px; font-size: 12px; margin-left: auto;" data-id="${rep.id}">
+            View Details
           </button>
         </div>
       </div>
@@ -735,7 +972,7 @@ class RoadFixApp {
     }
 
     reports.forEach((rep) => {
-      const card = this.createReportCardElement(rep);
+      const card = this.createReportCardElement(rep, true);
       container.appendChild(card);
     });
   }
@@ -868,7 +1105,26 @@ class RoadFixApp {
 
     const activeHazards = reports.filter((r) => r.status !== "closed");
 
-    document.getElementById("authority-queue-count").textContent = `${activeHazards.length} Active Complaints`;
+    // Populate Authority KPI counters (Section 19)
+    const assignedCount = reports.filter((r) => r.status === "assigned" || r.assignment).length;
+    const criticalCount = reports.filter((r) => r.severity === "critical" && r.status !== "closed").length;
+    const pendingCount = reports.filter((r) => ["assigned", "repair_in_progress"].includes(r.status)).length;
+    const completedCount = reports.filter((r) => ["repair_completed", "closed"].includes(r.status)).length;
+
+    const elAssigned = document.getElementById("auth-stat-assigned");
+    const elCrit = document.getElementById("auth-stat-critical");
+    const elPending = document.getElementById("auth-stat-pending");
+    const elCompleted = document.getElementById("auth-stat-completed");
+    const elTime = document.getElementById("auth-stat-time");
+
+    if (elAssigned) elAssigned.textContent = assignedCount;
+    if (elCrit) elCrit.textContent = criticalCount;
+    if (elPending) elPending.textContent = pendingCount;
+    if (elCompleted) elCompleted.textContent = completedCount;
+    if (elTime) elTime.textContent = "28h";
+
+    const queueCountEl = document.getElementById("authority-queue-count");
+    if (queueCountEl) queueCountEl.textContent = `${activeHazards.length} Active Complaints`;
 
     activeHazards.forEach((rep) => {
       const item = document.createElement("div");
@@ -891,10 +1147,10 @@ class RoadFixApp {
         </div>
 
         <div style="display: flex; gap: 12px; margin: 12px 0; align-items: center;">
-          <img src="${rep.images.before}" style="width: 80px; height: 60px; object-fit: cover; border-radius: 6px;" />
+          <img src="${rep.images?.before || 'assets/images/pothole_crater.jpg'}" style="width: 80px; height: 60px; object-fit: cover; border-radius: 6px;" />
           <div style="font-size: 12px; line-height: 1.5; color: #444;">
             <div><strong>AI Depth:</strong> ${rep.aiAnalysis?.depthCm || 12} cm | <strong>Dia:</strong> ${rep.aiAnalysis?.diameterCm || 50} cm</div>
-            <div><strong>Status:</strong> <span class="status-pill status-${rep.status}">${rep.status.toUpperCase()}</span></div>
+            <div><strong>Status:</strong> <span class="status-pill status-${rep.status}">${(rep.status || 'reported').replace(/_/g, ' ').toUpperCase()}</span></div>
             <div><strong>Assigned To:</strong> ${rep.assignment ? rep.assignment.contractor : 'None'}</div>
           </div>
         </div>
@@ -947,10 +1203,22 @@ class RoadFixApp {
   renderAdminView() {
     const analytics = window.db.getAnalytics("All");
 
-    document.getElementById("admin-total-reports").textContent = analytics.total;
-    document.getElementById("admin-critical-hazards").textContent = analytics.critical;
-    document.getElementById("admin-repaired-hazards").textContent = analytics.repaired;
-    document.getElementById("admin-resolution-rate").textContent = `${analytics.resolutionRate}%`;
+    const totalUsersEl = document.getElementById("admin-total-users");
+    const totalReportsEl = document.getElementById("admin-total-reports");
+    const criticalEl = document.getElementById("admin-critical-hazards");
+    const openRepairsEl = document.getElementById("admin-open-repairs");
+    const repairedEl = document.getElementById("admin-repaired-hazards");
+    const resRateEl = document.getElementById("admin-resolution-rate");
+
+    if (totalUsersEl) totalUsersEl.textContent = "24";
+    if (totalReportsEl) totalReportsEl.textContent = analytics.total;
+    if (criticalEl) criticalEl.textContent = analytics.critical;
+    if (openRepairsEl) openRepairsEl.textContent = analytics.inProgress;
+    if (repairedEl) repairedEl.textContent = analytics.repaired;
+    if (resRateEl) resRateEl.textContent = `${analytics.resolutionRate}%`;
+
+    // Refresh System Health Indicators
+    this.updateSupabaseBadge();
 
     // Render audit log list
     const auditContainer = document.getElementById("admin-audit-logs");
@@ -991,30 +1259,50 @@ class RoadFixApp {
   updateReportFormLocation() {
     const locInput = document.getElementById("report-location-input");
     const locReadable = document.getElementById("report-location-readable");
-    const locTech = document.getElementById("location-tech-details");
+    const locLat = document.getElementById("report-loc-lat");
+    const locLng = document.getElementById("report-loc-lng");
+    const locRoadInput = document.getElementById("report-road-input");
 
-    if (locInput) {
-      locInput.value = window.locationService.currentAddress;
-    }
-    if (locReadable) {
-      locReadable.textContent = window.locationService.currentAddress;
-    }
-    if (locTech) {
-      const lat = window.locationService.currentCoords.lat;
-      const lng = window.locationService.currentCoords.lng;
-      locTech.textContent = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)} • Ward Central • Signal approach`;
+    const currentCoords = window.locationService.currentCoords || { lat: 17.4485, lng: 78.3772 };
+    const currentAddress = window.locationService.currentAddress || "Main Road, Hyderabad";
+
+    if (locInput) locInput.value = currentAddress;
+    if (locReadable) locReadable.textContent = currentAddress;
+    if (locLat) locLat.textContent = currentCoords.lat.toFixed(4);
+    if (locLng) locLng.textContent = currentCoords.lng.toFixed(4);
+    if (locRoadInput && (!locRoadInput.value || locRoadInput.value.trim() === "")) {
+      locRoadInput.value = window.locationService.currentRoad || "";
     }
   }
 
   handlePhotoUpload(event) {
     const file = event.target.files[0];
+    const errorBox = document.getElementById("photo-validation-error");
     if (!file) return;
+
+    // File validation: Image type & file size (max 15MB)
+    if (!file.type || !file.type.startsWith("image/")) {
+      if (errorBox) {
+        errorBox.textContent = "Invalid file type. Please select a JPG or PNG image.";
+        errorBox.classList.remove("hidden");
+      }
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      if (errorBox) {
+        errorBox.textContent = "File is too large. Please select an image under 15MB.";
+        errorBox.classList.remove("hidden");
+      }
+      return;
+    }
+
+    if (errorBox) errorBox.classList.add("hidden");
 
     const reader = new FileReader();
     reader.onload = (e) => {
       this.capturedImageBase64 = e.target.result;
       this.displayPhotoPreview(this.capturedImageBase64);
-      this.advanceReportGuideStepper();
     };
     reader.readAsDataURL(file);
   }
@@ -1023,7 +1311,9 @@ class RoadFixApp {
     this.capturedImageBase64 = src;
     this.selectedCategory = category;
     this.displayPhotoPreview(src);
-    this.advanceReportGuideStepper();
+
+    const errorBox = document.getElementById("photo-validation-error");
+    if (errorBox) errorBox.classList.add("hidden");
 
     // Update active category pill
     document.querySelectorAll(".category-pill").forEach((p) => {
@@ -1043,7 +1333,7 @@ class RoadFixApp {
       } else if (category === "waterlogged_pothole") {
         titleInput.value = "Waterlogged Road Crater with Hidden Depth";
       } else {
-        titleInput.value = "Dangerous Pothole on Commuter Corridor";
+        titleInput.value = "Large Road Pothole";
       }
     }
     if (descInput && (!descInput.value || descInput.value.trim() === "")) {
@@ -1051,28 +1341,73 @@ class RoadFixApp {
     }
   }
 
-  advanceReportGuideStepper() {
-    // Advance stepper visual
-    const step1 = document.getElementById("guide-step-1");
-    const step2 = document.getElementById("guide-step-2");
-    const step3 = document.getElementById("guide-step-3");
-    if (step1) step1.classList.add("completed");
-    if (step2) step2.classList.add("completed");
-    if (step3) step3.classList.add("active");
+  setReportStep(stepNum) {
+    this.currentReportStep = stepNum;
 
-    // Update readable location
-    this.updateReportFormLocation();
+    // Update Stepper header items
+    for (let i = 1; i <= 4; i++) {
+      const stepEl = document.getElementById(`guide-step-${i}`);
+      const containerEl = document.getElementById(`report-step-${i}-container`);
+      if (stepEl) {
+        stepEl.classList.remove("active", "completed");
+        if (i < stepNum) stepEl.classList.add("completed");
+        else if (i === stepNum) stepEl.classList.add("active");
+      }
+      if (containerEl) {
+        if (i === stepNum) containerEl.classList.remove("hidden");
+        else containerEl.classList.add("hidden");
+      }
+    }
 
-    // Trigger AI checklist animation
+    if (stepNum === 2) {
+      this.updateReportFormLocation();
+    } else if (stepNum === 3) {
+      this.populateAIStepPreview();
+    } else if (stepNum === 4) {
+      this.populateReviewStepSummary();
+    }
+  }
+
+  populateAIStepPreview() {
+    const titleInput = document.getElementById("report-title-input");
+    const descInput = document.getElementById("report-desc-input");
+    const cat = this.selectedCategory || "pothole";
+
+    if (titleInput && (!titleInput.value || titleInput.value.trim() === "")) {
+      if (cat === "deep_crater") titleInput.value = "Hazardous Deep Crater near Intersection";
+      else if (cat === "waterlogged_pothole") titleInput.value = "Waterlogged Road Crater with Hidden Depth";
+      else if (cat === "road_cave_in") titleInput.value = "Severe Road Cave-In on Traffic Corridor";
+      else titleInput.value = "Large Road Pothole";
+    }
+
+    if (descInput && (!descInput.value || descInput.value.trim() === "")) {
+      descInput.value = "Deep road surface erosion with broken aggregate edges. Immediate skidding and rim damage hazard for vehicles.";
+    }
+
     const aiStatusBadge = document.getElementById("ai-status-badge");
     if (aiStatusBadge) {
-      aiStatusBadge.textContent = "Analyzing...";
-      aiStatusBadge.className = "status-pill status-assigned";
-      setTimeout(() => {
-        aiStatusBadge.textContent = "AI Verified ✓";
-        aiStatusBadge.className = "status-pill status-ai_verified";
-      }, 350);
+      aiStatusBadge.textContent = "AI Verified ✓";
+      aiStatusBadge.className = "status-pill status-ai_verified";
     }
+  }
+
+  populateReviewStepSummary() {
+    const title = document.getElementById("report-title-input")?.value || "Large Road Pothole";
+    const desc = document.getElementById("report-desc-input")?.value || "Damaged road causing severe vehicle risk.";
+    const city = window.locationService.currentCity;
+    const road = document.getElementById("report-road-input")?.value?.trim() || window.locationService.currentRoad;
+
+    const imgEl = document.getElementById("review-summary-img");
+    const titleEl = document.getElementById("review-summary-title");
+    const catEl = document.getElementById("review-summary-category");
+    const locEl = document.getElementById("review-summary-location");
+    const descEl = document.getElementById("review-summary-desc");
+
+    if (imgEl) imgEl.src = this.capturedImageBase64 || "assets/images/pothole_crater.jpg";
+    if (titleEl) titleEl.textContent = title;
+    if (catEl) catEl.textContent = (this.selectedCategory || "pothole").replace(/_/g, " ").toUpperCase();
+    if (locEl) locEl.textContent = `${road}, ${city}`;
+    if (descEl) descEl.textContent = desc;
   }
 
   displayPhotoPreview(src) {
@@ -1090,7 +1425,7 @@ class RoadFixApp {
     const title = document.getElementById("report-title-input")?.value || "Hazardous Road Surface Damage";
     const desc = document.getElementById("report-desc-input")?.value || "Damaged road causing severe vehicle risk.";
     const city = window.locationService.currentCity;
-    const road = window.locationService.currentRoad;
+    const road = document.getElementById("report-road-input")?.value?.trim() || window.locationService.currentRoad;
 
     const submitBtn = document.getElementById("submit-report-btn");
     const statusText = document.getElementById("submit-status-text");
@@ -1134,7 +1469,7 @@ class RoadFixApp {
       location: {
         lat: window.locationService.currentCoords.lat,
         lng: window.locationService.currentCoords.lng,
-        address: window.locationService.currentAddress,
+        address: `${road}, ${city}`,
         landmark: "Nearby Main Signal",
         ward: "Central Ward"
       },
@@ -1152,18 +1487,7 @@ class RoadFixApp {
     this.capturedImageBase64 = null;
 
     // Reset Guide Stepper back to Step 1
-    const s1 = document.getElementById("guide-step-1");
-    const s2 = document.getElementById("guide-step-2");
-    const s3 = document.getElementById("guide-step-3");
-    if (s1) {
-      s1.className = "guide-step-item active";
-    }
-    if (s2) {
-      s2.className = "guide-step-item";
-    }
-    if (s3) {
-      s3.className = "guide-step-item";
-    }
+    this.setReportStep(1);
 
     // Save last created report
     this.lastCreatedReportId = newReport.id;

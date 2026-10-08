@@ -8,12 +8,12 @@
 
 class RoadVisionAIService {
   constructor() {
-    this.apiKey = localStorage.getItem("roadfix_ai_key") || "";
+    this.apiKey = localStorage.getItem("roadfix_gemini_api_key") || window.ROADFIX_CONFIG?.GEMINI_API_KEY || "";
   }
 
   setApiKey(key) {
-    this.apiKey = key.trim();
-    localStorage.setItem("roadfix_ai_key", this.apiKey);
+    this.apiKey = (key || "").trim();
+    localStorage.setItem("roadfix_gemini_api_key", this.apiKey);
   }
 
   /**
@@ -183,9 +183,95 @@ class RoadVisionAIService {
     return R * c;
   }
 
-  async callExternalVisionAPI(imageBase64, context) {
-    // Standard schema hook for external Gemini / Vision API
-    return null;
+  async callExternalVisionAPI(imageBase64OrUrl, context) {
+    if (!this.apiKey) return null;
+
+    try {
+      let base64Data = imageBase64OrUrl;
+      let mimeType = "image/jpeg";
+
+      if (imageBase64OrUrl.startsWith("data:")) {
+        const parts = imageBase64OrUrl.split(",");
+        const mimeMatch = parts[0].match(/:(.*?);/);
+        if (mimeMatch) mimeType = mimeMatch[1];
+        base64Data = parts[1];
+      } else {
+        const resp = await fetch(imageBase64OrUrl);
+        const blob = await resp.blob();
+        mimeType = blob.type || "image/jpeg";
+        base64Data = await new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result.split(",")[1]);
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      const prompt = `You are RoadVision AI, an expert road safety assessment vision system.
+Analyze this road hazard photo. Return ONLY a single raw valid JSON object (no markdown, no backticks):
+{
+  "detected": true,
+  "hazardType": "${context.category || 'pothole'}",
+  "confidence": 96.5,
+  "severity": "critical",
+  "estimatedDepthCm": 16,
+  "estimatedDiameterCm": 75,
+  "hazardLevel": "High Risk Road Cavity",
+  "insights": "Severe pavement depression. High risk of rim damage and bike instability.",
+  "boundingBox": { "ymin": 25, "xmin": 20, "ymax": 75, "xmax": 80, "label": "Hazard" }
+}`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${encodeURIComponent(this.apiKey)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                { text: prompt },
+                {
+                  inlineData: {
+                    mimeType: mimeType,
+                    data: base64Data
+                  }
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            responseMimeType: "application/json"
+          }
+        })
+      });
+
+      if (!res.ok) {
+        console.warn("Gemini API call returned non-200:", res.status);
+        return null;
+      }
+
+      const data = await res.json();
+      const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) return null;
+
+      const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+      const parsed = JSON.parse(cleanJson);
+
+      return {
+        detected: parsed.detected ?? true,
+        confidence: parsed.confidence || 95.0,
+        severity: ["critical", "high", "medium", "low"].includes(parsed.severity) ? parsed.severity : "high",
+        depthCm: parsed.estimatedDepthCm || 15,
+        diameterCm: parsed.estimatedDiameterCm || 65,
+        hazardLevel: parsed.hazardLevel || "High Risk Road Cavity",
+        insights: parsed.insights || "Pavement depression detected by Gemini Vision AI.",
+        boundingBox: parsed.boundingBox || { ymin: 25, xmin: 20, ymax: 75, xmax: 80, label: context.category || "Hazard" },
+        isDuplicate: false,
+        source: "Gemini 1.5 Flash Vision"
+      };
+    } catch (e) {
+      console.warn("Gemini Vision API parsing error, falling back to local engine:", e);
+      return null;
+    }
   }
 }
 

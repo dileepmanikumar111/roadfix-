@@ -9,6 +9,8 @@
   const DEFAULT_ENV = {
     SUPABASE_URL: "https://pnqgwxmgtptzygydttzr.supabase.co",
     SUPABASE_PUBLISHABLE_KEY: "sb_publishable_Vk-Fz3sITT2fFNVqrVxigg_gEONLaJ5",
+    GEMINI_API_KEY: "",
+    CARTO_API_KEY: "",
     APP_NAME: "RoadFix",
     ENVIRONMENT: "production",
     VERSION: "2.4.0"
@@ -26,6 +28,14 @@
       if (parsed && (parsed.anonKey || parsed.publishableKey)) {
         savedConfig.SUPABASE_PUBLISHABLE_KEY = parsed.anonKey || parsed.publishableKey;
       }
+    }
+    const savedGeminiKey = localStorage.getItem("roadfix_gemini_api_key");
+    if (savedGeminiKey) {
+      savedConfig.GEMINI_API_KEY = savedGeminiKey;
+    }
+    const savedCartoKey = localStorage.getItem("roadfix_carto_api_key");
+    if (savedCartoKey) {
+      savedConfig.CARTO_API_KEY = savedCartoKey;
     }
   } catch (e) {
     console.warn("Could not read local config overrides:", e);

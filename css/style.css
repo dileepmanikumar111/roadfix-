@@ -1649,3 +1649,341 @@ button, input, select, textarea {
 .hidden {
   display: none !important;
 }
+
+/* ==========================================================================
+   DESKTOP TOP NAVIGATION MENU & DATA MODE BADGES
+   ========================================================================== */
+.desktop-nav-menu {
+  display: none;
+}
+
+@media (min-width: 860px) {
+  .desktop-nav-menu {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 16px;
+  }
+}
+
+.desktop-nav-link {
+  background: transparent;
+  border: none;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 700;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.desktop-nav-link:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-deep-blue);
+}
+
+.desktop-nav-link.active {
+  background: var(--color-blue-tint);
+  color: var(--color-deep-blue);
+}
+
+.desktop-nav-report {
+  background: var(--color-saffron) !important;
+  color: #000080 !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 6px rgba(255, 153, 51, 0.3);
+}
+
+.desktop-nav-report:hover {
+  background: var(--color-saffron-hover) !important;
+  color: #FFFFFF !important;
+}
+
+.data-mode-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  letter-spacing: 0.3px;
+  transition: all 0.2s ease;
+}
+
+.data-mode-badge.live {
+  background: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+}
+
+.data-mode-badge.demo {
+  background: #FEF3C7;
+  color: #B45309;
+  border: 1px solid #FDE68A;
+}
+
+/* ==========================================================================
+   MAP ENHANCEMENTS & LEGEND
+   ========================================================================== */
+.map-legend-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #334155;
+  flex-wrap: wrap;
+}
+
+.map-search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.map-center-btn {
+  background: #FFFFFF;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-deep-blue);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.map-center-btn:hover {
+  background: var(--color-blue-tint);
+  border-color: var(--color-ashoka-blue);
+}
+
+/* ==========================================================================
+   REPORT LIFECYCLE TIMELINE
+   ========================================================================== */
+.report-timeline-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #F8FAFC;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin: 10px 0;
+  overflow-x: auto;
+}
+
+.timeline-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 52px;
+}
+
+.timeline-node {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #E2E8F0;
+  color: #64748B;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.timeline-step.completed .timeline-node {
+  background: var(--color-green);
+  color: #FFFFFF;
+}
+
+.timeline-step.active .timeline-node {
+  background: var(--color-saffron);
+  color: #000080;
+  box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.25);
+}
+
+.timeline-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: #64748B;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.timeline-step.active .timeline-label {
+  color: var(--color-deep-blue);
+}
+
+.timeline-step.completed .timeline-label {
+  color: var(--color-green);
+}
+
+.timeline-line {
+  flex: 1;
+  height: 2px;
+  background: #E2E8F0;
+  margin: 0 4px;
+  margin-bottom: 12px;
+}
+
+.timeline-line.completed {
+  background: var(--color-green);
+}
+
+/* ==========================================================================
+   SYSTEM HEALTH GRID (ADMIN)
+   ========================================================================== */
+.system-health-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+@media (min-width: 600px) {
+  .system-health-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.health-item {
+  background: #F8FAFC;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.health-item span {
+  display: block;
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+}
+
+.health-status {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.health-status.online, .health-status.connected {
+  color: var(--color-green);
+}
+
+.health-status.pending {
+  color: var(--color-saffron);
+}
+
+.health-status.offline {
+  color: var(--color-danger);
+}
+
+/* ==========================================================================
+   MULTI-STEP REPORT WIZARD & SUMMARY CARD
+   ========================================================================== */
+.report-step-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.report-step-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.photo-buttons-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn-upload-choice {
+  background: #FFFFFF;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-deep-blue);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+}
+
+.btn-upload-choice:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-ashoka-blue);
+}
+
+.review-summary-card {
+  background: #F8FAFC;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+.review-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 12px;
+}
+
+.review-summary-row:last-child {
+  border-bottom: none;
+}
+
+.review-summary-label {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  min-width: 110px;
+}
+
+.review-summary-val {
+  color: var(--color-deep-blue);
+  font-weight: 700;
+  text-align: right;
+  flex: 1;
+}
+
+.authority-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 12px 0;
+}
+
+@media (min-width: 600px) {
+  .authority-kpi-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
